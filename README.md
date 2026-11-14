@@ -6,6 +6,8 @@ A compact resort-management game. Welcome families, set package prices, balance 
 
 ## Play on Windows
 
+[Download the latest Windows build](https://github.com/dgeller97/All-Inclusive/releases/latest/download/AllInclusive-Windows.zip), extract the ZIP, and double-click `AllInclusive.exe`. No Godot installation is required. [Release notes and checksums](https://github.com/dgeller97/All-Inclusive/releases/latest) are available on GitHub. Use the Windows ZIP asset, not GitHub's automatically generated source-code archives.
+
 Extract `build/AllInclusive-Windows.zip` and open `AllInclusive.exe`. From the project folder, you can also open `build/windows/AllInclusive.exe` directly. The game runs on 64-bit Windows and includes its assets.
 
 Open the resort to begin a three-day run. At 1×, the resort clock runs for 12 minutes before the Day 3 recap. Reach eight completed stays, earn a 75 average rating, and install the pool terrace. The recap lets you keep managing on Day 4 or start a fresh run.
