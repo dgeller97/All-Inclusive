@@ -16,7 +16,7 @@ func check(condition: bool, message: String) -> void:
 
 func _initialize() -> void:
 	var active := Layout.new()
-	check(active.landscape.props.size() == 67, "All 67 default scenery objects are present and editable")
+	check(active.landscape.props.size() == 71 and active.amenities().size() == 4, "All 67 scenery objects and four starter amenities are present and editable")
 	check(active.readiness().ok and active.room_points().size() == 4, "Default landscaping preserves working resort")
 	check(active.landscape.path_at(Vector2i(10, 30)) == "stone", "Original promenade is model path data")
 	var draft: Layout = active.duplicate_layout()

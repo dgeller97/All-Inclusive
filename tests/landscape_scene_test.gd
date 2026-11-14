@@ -36,6 +36,7 @@ func _run() -> void:
 
 func _test_developer() -> void:
 	_start("Developer · Free build")
+	_use_pre_amenity_fixture()
 	var active: Layout = game.simulation.layout
 	_open_landscape()
 	var draft: Layout = game.design.draft
@@ -171,6 +172,7 @@ func _test_developer() -> void:
 
 func _test_regular() -> void:
 	_start("Regular resort")
+	_use_pre_amenity_fixture()
 	_open_landscape()
 	var cell := Vector2i(44, 14)
 	_tool("sand")
@@ -254,6 +256,7 @@ func _test_relaunch() -> void:
 
 func _test_revision_three() -> void:
 	var old := Sim.new()
+	old.layout = Layout.new(false)
 	var room := old.layout.add_building("bedroom", Rect2(320, 80, 48, 48))
 	if not room.ok:
 		_check(false, "Revision 3 fixture site available: " + room.reason)
@@ -322,6 +325,17 @@ func _test_protected_save() -> void:
 	_check(written and game.simulation != current and not game.simulation.layout.landscape.terrain_overrides.has(Vector2i(95, 14))
 		and FileAccess.get_file_as_bytes(SaveSlot.PATH) == before,
 		"Legacy no-op ocean override loads and normalizes without rewriting the save")
+
+
+func _use_pre_amenity_fixture() -> void:
+	# The original brush and scenery sites are occupied by a new-run court.
+	# Run these specific editing regressions against that older hotel geometry.
+	var sim: Sim = game.simulation
+	var plan: Layout = sim.layout.duplicate_layout()
+	for venue in plan.amenities():
+		plan.remove_prop(venue.id)
+	sim.apply_construction(plan)
+	game._refresh()
 
 
 func _open_scene() -> void:

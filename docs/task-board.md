@@ -1,6 +1,17 @@
 # Task board
 
-## Delivered revision 6
+## Delivered revision 7
+
+| Task | Owner | State | Contract / evidence |
+| --- | --- | --- | --- |
+| Research and amenity contract | Root + PM | Complete | Official resort sources; four functional dry-land amenities, fixed coast |
+| Amenity model, activities and editor | Model/UI developer | Complete | Independent contract127 and scene61; actual IDs/routes/slots, new-run starter set, costs and migration |
+| Pixel amenity art and guest interaction | Beach visual specialist | Complete | Visual121; accepted actual-phase CPU preview, readable parasol/net/bar/stage |
+| Independent tests, regressions and package | Root + specialists + PM | Complete | Management73+9, legacy/current saves, full regression roster, standalone smoke and archived executable hash verified |
+
+Current package: `build/AllInclusive-Windows.zip`, 41,301,812 bytes, SHA-256 `66199887A1FC43EAD15C01C768348359DFAA16F1BF4C55A1E6DEEC51EB8A2EE5`. Executable: 111,390,200 bytes, SHA-256 `A15CDA2AC965BE162DFF726759F95797D05A67F598C96DF1AE72612613E6ACCE`. See `revision-7.md` and `revision-7-validation.md`. Specialists finished, production frozen, source ready for root's authorized commit/push. No native playtesting or new GitHub release.
+
+## Earlier revision 6 (superseded artifact)
 
 | Task | Owner | State | Contract / evidence |
 | --- | --- | --- | --- |
@@ -9,7 +20,7 @@
 | Compatibility and independent acceptance | Developer + root + PM | Complete | Management73+9, construction46+6, landscape35, appearance46, legacy saves and seeded schedules passed |
 | Windows executable and archive | Developer + root | Complete | Standalone headless smoke and matching archived executable verified; no native tester or Git publication |
 
-Current package: `build/AllInclusive-Windows.zip`, 41,274,527 bytes, SHA-256 `9A1796C03BD08A5BFDD601CAA2BA8DB0157086F48AADDDDB7943F343E4907ADB`. Executable: 111,362,472 bytes, SHA-256 `FB06BB622432D4E34A0AC29B56E887A027F7FCEE9FD52D3EB48DDECD8573C05C`. See `revision-6.md` for the contract and `revision-6-validation.md` for evidence. Specialists released; all authorized work complete. Native playtesting remains deferred.
+Historical package: 41,274,527 bytes, SHA-256 `9A1796C03BD08A5BFDD601CAA2BA8DB0157086F48AADDDDB7943F343E4907ADB`. Executable: 111,362,472 bytes, SHA-256 `FB06BB622432D4E34A0AC29B56E887A027F7FCEE9FD52D3EB48DDECD8573C05C`. See `revision-6.md` and `revision-6-validation.md` for historical evidence. Native playtesting remained deferred.
 
 ## Earlier revision 5 (superseded artifact)
 

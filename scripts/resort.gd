@@ -8,7 +8,8 @@ const SaveSlot = preload("res://scripts/save_slot.gd")
 const Layout = preload("res://scripts/layout_model.gd")
 const ResortDesign = preload("res://scripts/resort_design.gd")
 const DesignUI = preload("res://scripts/design_ui.gd")
-const SAVE_VERSION := 6
+const SAVE_VERSION := 7
+const DINING_SAVE_VERSION := 6
 const EXTERIOR_SAVE_VERSION := 5
 const LANDSCAPE_SAVE_VERSION := 4
 const INK := Color("#382936")
@@ -132,7 +133,7 @@ func _build_screen() -> void:
 	camera.size = VIEW_SIZE
 	add_child(camera)
 	camera.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	camera.configure(ResortMap.WORLD_BOUNDS, Vector2(265, 150), 1.8)
+	camera.configure(ResortMap.WORLD_BOUNDS, Vector2(280, 170), 1.7)
 
 	map = ResortMap.new()
 	map.name = "ResortMap"
@@ -679,7 +680,9 @@ func _write_run(draft: Layout) -> bool:
 func _load_run() -> void:
 	var data: Dictionary = SaveSlot.read()
 	var version: Variant = data.get("version")
-	var has_landscape: bool = version in [LANDSCAPE_SAVE_VERSION, EXTERIOR_SAVE_VERSION, SAVE_VERSION]
+	var has_landscape: bool = version in [LANDSCAPE_SAVE_VERSION, EXTERIOR_SAVE_VERSION, DINING_SAVE_VERSION, SAVE_VERSION]
+	var has_appearance: bool = version in [EXTERIOR_SAVE_VERSION, DINING_SAVE_VERSION, SAVE_VERSION]
+	var has_meals: bool = version in [DINING_SAVE_VERSION, SAVE_VERSION]
 	if has_landscape and _save_changes_protected_coast(data):
 		_show_save_error("This save changes the protected coast. Your file and run are intact.")
 		return
@@ -688,13 +691,13 @@ func _load_run() -> void:
 		(version in [1, 2, 3] or has_landscape) and data.get("simulation") is Dictionary
 		and data.get("speed") is int and data.speed in SPEEDS and data.get("elapsed") is float
 		and is_finite(data.elapsed) and data.elapsed >= 0.0 and data.elapsed < 1.0
-		and loaded.restore(data.simulation, version < 3, has_landscape, version == SAVE_VERSION)
+		and loaded.restore(data.simulation, version < 3, has_landscape, has_meals, version == SAVE_VERSION)
 	)
 	var draft: Layout
 	if valid and data.version >= 3:
 		valid = data.get("draft") is Dictionary
 		if valid and not data.draft.is_empty():
-			draft = Layout.new()
+			draft = Layout.new(false)
 			valid = (not has_landscape or data.draft.get("landscape") is Dictionary) and draft.restore(data.draft)
 			if valid and not data.draft.has("landscape"):
 				Sim.prune_migrated_scenery(draft, loaded.layout)
@@ -707,7 +710,7 @@ func _load_run() -> void:
 	elapsed = data.elapsed
 	started = true
 	paused = true
-	exterior_view = version in [EXTERIOR_SAVE_VERSION, SAVE_VERSION] and data.get("exterior_view") == true
+	exterior_view = has_appearance and data.get("exterior_view") == true
 	ui.close_panel()
 	camera.home()
 	if data.get("camera") is Dictionary:
@@ -820,12 +823,16 @@ func _smoke_test() -> void:
 	var waited_for_table := false
 	var ate_at_table := false
 	var left_table := false
+	var activities := {}
 	for i in range(3 * Sim.DAY_LENGTH):
 		simulation.tick()
 		collected = collected or simulation.count_at(1, "service") > 0
 		waited_for_table = waited_for_table or simulation.count_at(1, "wait_table") > 0
 		ate_at_table = ate_at_table or simulation.count_at(1, "eating") > 0
 		left_table = left_table or simulation.count_at(1, "to_pool") > 0
+		for family in simulation.families:
+			for kind in family.leisure_completed:
+				activities[kind] = true
 		if simulation.day == 2 and simulation.second == 0:
 			simulation.apply_construction(draft)
 	_refresh()
@@ -833,11 +840,15 @@ func _smoke_test() -> void:
 		push_error("All Inclusive smoke test did not exercise the full restaurant meal.")
 		get_tree().quit(1)
 		return
+	if activities.size() != Sim.LEISURE_DURATIONS.size():
+		push_error("All Inclusive smoke test did not exercise all four beach activities.")
+		get_tree().quit(1)
+		return
 	if simulation.cash != 1120 or simulation.reviews.size() != 12 or not simulation.terrace or not simulation.stopped:
 		push_error("All Inclusive smoke test failed: %s" % simulation.snapshot())
 		get_tree().quit(1)
 		return
-	if not is_equal_approx(simulation.average(), 93.25):
+	if not is_equal_approx(simulation.average(), 1145.0 / 12.0):
 		push_error("All Inclusive smoke test rating mismatch: %f" % simulation.average())
 		get_tree().quit(1)
 		return
@@ -851,7 +862,7 @@ func _smoke_test() -> void:
 		get_tree().quit(1)
 		return
 	_open_dialog("recap")
-	print("ALL INCLUSIVE SMOKE PASS — 12 stays, 93.25 rating, $1120, restaurant meals, furnished terrace, editable landscape, ocean and audio loaded")
+	print("ALL INCLUSIVE SMOKE PASS — 12 stays, %.2f rating, $1120, restaurant meals, furnished terrace, four beach activities, editable landscape, ocean and audio loaded" % simulation.average())
 	get_tree().quit()
 
 
@@ -868,7 +879,10 @@ func _smoke_landscape() -> bool:
 			if not path.is_empty():
 				path_counts[path] = path_counts.get(path, 0) + 1
 	return (
-		map.landscape_renderer != null and counts == {"palm": 38, "bush": 24, "rock": 4, "beach_flag": 1}
+		map.landscape_renderer != null and counts == {
+			"palm": 38, "bush": 24, "rock": 4, "beach_flag": 1,
+			"beach_lounge": 1, "volleyball": 1, "beach_bar": 1, "stage": 1,
+		}
 		and path_counts == {"stone": 158, "boardwalk": 56} and landscape.terrain_at(Vector2i(95, 14)) == "water"
 		and landscape.terrain_at(Vector2i(44, 14)) == "dirt"
 	)

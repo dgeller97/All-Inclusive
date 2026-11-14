@@ -136,10 +136,11 @@ func _test_developer() -> void:
 	_check(pose.swim and water.has_point(pose.point) and water.has_point(pose.child)
 		and not old_water.has_point(pose.point), "Swimming sprites use the relocated pool's water bounds")
 	_tick(18)
-	var from_pool := initial.layout.route(pool_deck, initial.layout.room_points()[0])
+	var venue := initial.layout.amenity_by_id(family.amenity_id)
+	var from_pool := initial.layout.route(pool_deck, venue.get("point", Vector2.INF))
 	pose = game.map._pose(family)
-	_check(family.phase == "return_room" and from_pool[0] == pool_deck
-		and _on_route(pose.point, from_pool), "Guests return from the relocated pool via its deck")
+	_check(family.phase == "to_leisure" and not from_pool.is_empty() and from_pool[0] == pool_deck
+		and _on_route(pose.point, from_pool), "Guests go from the relocated pool deck to a real beach activity")
 
 
 func _test_regular() -> void:

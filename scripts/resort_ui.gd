@@ -22,7 +22,7 @@ const SPEEDS := [1, 2, 4]
 const PANELS := {
 	"package": ["Booking", "Booking desk", "Choose a package and set the room price", Vector2(372, 224)],
 	"staff": ["Staff", "Staff assignments", "Assign the floating worker and check dining capacity", Vector2(344, 282)],
-	"pool": ["Pool", "Pool terrace", "Check the pool terrace", Vector2(320, 192)],
+	"pool": ["Leisure", "Pool and beach", "Check pool upgrades and beach activities", Vector2(336, 326)],
 	"reviews": ["Reviews", "Latest review", "Read the latest guest review", Vector2(336, 192)],
 	"goals": ["Goals", "Day 3 targets", "Check the opening weekend targets", Vector2(330, 224)],
 	"settings": ["Settings", "Settings", "Save, load, or change sound (Esc)", Vector2(320, 236)],
@@ -314,10 +314,19 @@ func _build_staff() -> void:
 
 
 func _build_pool() -> void:
-	_body.pool_status = _label(_popover, Rect2(15, 57, 290, 27), "", 17, INK)
-	_label(_popover, Rect2(15, 86, 290, 23), "Adds a pool slot and improves reviews.", 14, MUTED)
-	_label(_popover, Rect2(15, 110, 290, 20), "Needs two accessible loungers and an umbrella.", 13, MUTED)
-	_button(_popover, Rect2(14, 138, 292, 37), "Open Build", _request.bind("build"), false)
+	_body.pool_status = _label(_popover, Rect2(15, 53, 305, 25), "", 17, INK)
+	_label(_popover, Rect2(15, 78, 305, 20), "Two loungers and an umbrella add a pool slot.", 13, MUTED)
+	_divider(_popover, Rect2(15, 105, 306, 1), LINE)
+	_body.amenities = {}
+	var y := 112
+	for kind in Sim.LEISURE_DURATIONS:
+		var info: Dictionary = Sim.Layout.Landscape.PROP_CATALOG[kind]
+		_label(_popover, Rect2(15, y, 154, 23), info.label, 14, INK)
+		_body.amenities[kind] = _label(_popover, Rect2(170, y, 150, 23), "", 14, TEAL, HORIZONTAL_ALIGNMENT_RIGHT)
+		y += 26
+	_label(_popover, Rect2(15, 222, 305, 21), "Shows begin at 03:00 · Drinks included", 13, MUTED)
+	_label(_popover, Rect2(15, 245, 305, 21), "Each activity adds 1 rating point, up to 3.", 13, MUTED)
+	_button(_popover, Rect2(14, 275, 308, 37), "Open Build", _request.bind("build"), false)
 
 
 func _build_reviews() -> void:
@@ -374,6 +383,18 @@ func _refresh_panel(sim: Sim) -> void:
 			_body.tables.text = "Tables %d/%d in use · %d waiting to eat" % [sim.occupied_tables(), sim.layout.dining_tables().size(), sim.count_at(1, "wait_table")]
 		"pool":
 			_body.pool_status.text = "Terrace installed" if sim.terrace else "Terrace needs furnishings"
+			for kind in _body.amenities:
+				var rows := sim.layout.amenities(kind)
+				var available := 0
+				var occupied := 0
+				for amenity in rows:
+					available += amenity.capacity
+					occupied += sim.occupied_amenity(amenity.id)
+				if available > 0:
+					_body.amenities[kind].text = "%d / %d families" % [occupied, available]
+				else:
+					var placed := sim.layout.landscape.props.any(func(prop: Dictionary) -> bool: return prop.kind == kind)
+					_body.amenities[kind].text = "No guest access" if placed else "Not built"
 		"reviews":
 			if sim.reviews.is_empty():
 				_body.score.text = "No reviews yet"
@@ -383,6 +404,8 @@ func _refresh_panel(sim: Sim) -> void:
 				var review: Dictionary = sim.reviews.back()
 				_body.score.text = "%d / 100" % review.score
 				_body.review_source.text = "Room %s · Day %d" % [char(65 + review.room), review.day]
+				if review.leisure_bonus > 0:
+					_body.review_source.text += " · +%d from activities" % review.leisure_bonus
 				_body.review_note.text = review.note
 		"goals":
 			var stays: int = sim.milestone.get("stays", sim.reviews.size())

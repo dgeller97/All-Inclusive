@@ -45,5 +45,12 @@
 | Track table waiting independently and derive reservations from family phases | Produces clear feedback and one authoritative reservation state without double-booked tables |
 | Keep the focused R6 meal timings despite limited extra buffet-staff payoff | Independent tests prove tables improve real capacity; broader staffing rebalance is documented rather than silently expanding this interaction request |
 | Accept R6 after correcting seated readability and compact queue labels | Final real-phase CPU previews, routed/save regressions and standalone executable/archive verification pass; native playtesting remains deferred |
+| R7 implements four connected dry-land amenities rather than an exhaustive resort catalog | Matches official all-inclusive examples and the user's hour-long autonomous request while leaving time for save compatibility and export checks |
+| Add free starter amenities only to new runs; preserve existing saved layouts | New content is immediately demonstrable without overwriting the player's construction or scenery |
+| Reuse editable landscape props for leisure facilities and derive guest reservations from their actual IDs | Keeps placement, costs, removal, routes and activities aligned without a second construction system |
+| Keep ocean conditions separate from dry-beach activity availability | A red water flag should not arbitrarily close a bar, court or shaded lounge when ocean swimming is not implemented |
+| Give completed distinct leisure activities a capped +3 satisfaction benefit | Buying amenities in preserved old layouts has an observable guest benefit without changing package prices or adding a separate revenue system |
+| Relocate starter lounge/stage, rotate the court and adjust Home framing after CPU inspection | Reduces palm occlusion, makes the net readable and keeps amenities above the HUD while preserving original scenery and saved cameras |
+| Accept R7 after independent per-kind save checkpoints, routed editing, visual and standalone package checks | Four functioning editable amenities form a coherent stopping point within the autonomous work window; source is handed to root for the authorized push |
 
 Further implementation decisions will be recorded after design handoff and test evidence.

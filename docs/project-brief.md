@@ -2,7 +2,7 @@
 
 ## Current revision
 
-Revision 6 adds real restaurant interaction: guests collect food at the editable buffet counter, reserve a reachable table, sit/eat and depart from the table. Use `revision-6.md` for current ownership, timing and save contracts. Revision 5's exterior view, named signs and building finishes remain. Revision 4's editable dry-land terrain, functional paths and scenery retain the user's fixed coast. `revision-3.md`, `design-mode-ui.md` and `modular-art.md` cover construction, Regular costs, Developer free building and staged application. The original brief below remains the baseline management loop; the pool improvement comes from actual placed furniture rather than the original one-click upgrade.
+Revision 7 adds functional editable dry-beach relaxation, volleyball, a beach bar and evening stage entertainment. Use `revision-7.md` for the current model/pose contract and `resort-research.md` for official-source design context. Revision 6's actual buffet/table meal loop and revision 5's exterior view, names and finishes remain. The user-selected fixed coast is authoritative; no ocean swimming or coast painting is introduced. Earlier construction, Regular/Developer costs, staged layout application and the compact management loop remain in place.
 
 ## Outcome
 

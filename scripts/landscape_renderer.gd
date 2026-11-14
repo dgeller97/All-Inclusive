@@ -2,6 +2,7 @@ extends Node2D
 ## Draws construction landscape layers over the original shoreline texture.
 
 const Landscape = preload("res://scripts/landscape_model.gd")
+const AmenityArt := preload("res://scripts/amenity_renderer.gd")
 const DEFAULTS := preload("res://assets/art/landscape_defaults.png")
 const MATERIALS := preload("res://assets/art/landscape_materials.png")
 const PROPS := preload("res://assets/art/landscape_props.png")
@@ -59,7 +60,7 @@ func present(landscape: Landscape, _visual_time := 0.0) -> void:
 		_cache_path(cell)
 	_props.assign(landscape.props.duplicate(true))
 	_props.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return prop_anchor(a).y < prop_anchor(b).y)
+		return _prop_depth(a) < _prop_depth(b))
 	queue_redraw()
 
 
@@ -126,8 +127,17 @@ static func prop_anchor(prop: Dictionary) -> Vector2:
 	return Vector2(cell[0], cell[1]) * GRID + Vector2(offset[0], offset[1])
 
 
+func _prop_depth(prop: Dictionary) -> float:
+	if AmenityArt.handles(prop.kind):
+		return _landscape.prop_rect(prop).end.y
+	return prop_anchor(prop).y
+
+
 static func draw_prop(canvas: CanvasItem, prop: Dictionary, tint := Color.WHITE) -> void:
 	var kind: String = prop.kind
+	if AmenityArt.handles(kind):
+		AmenityArt.draw_prop(canvas, prop, tint)
+		return
 	var rotation := posmod(int(prop.get("rotation", 0)), 4)
 	if kind == "bench":
 		var cell: Array = prop.cell

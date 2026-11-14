@@ -108,12 +108,12 @@ func _test_staffing() -> void:
 
 func _test_recap() -> void:
 	var sim := Sim.new()
-	_tick(sim, 158)
+	_tick(sim, 198)
 	_check(sim.cash == 620 and sim.rooms == [0, 1, 2, 3] and not sim.terrace,
 		"Standard Day 1 posts four room charges and keeps the original pool")
 	_check(sim.families[3].waits[2] == 12 and sim.families[3].dining_wait == 24 and sim.families[3].phase == "rest", "Standard with one table yields a 12-second peak pool wait and a 24-second peak dining wait")
-	_tick(sim, 81)
-	_check(_closed(sim) and _scores(sim) == [92, 91, 86, 80], "Day 1 closes with four exact checkout ratings and all rooms released")
+	_tick(sim, 41)
+	_check(_closed(sim) and _scores(sim) == [95, 94, 89, 83], "Day 1 closes with four exact checkout ratings and all rooms released")
 	_check(sim.reviews.slice(1).all(func(review: Dictionary) -> bool: return review.note == "Long dining table wait"),
 		"Day 1 penalized reviews identify table waits")
 	_tick(sim, 1)
@@ -123,9 +123,9 @@ func _test_recap() -> void:
 	_check(sim.capacity(2) == 3, "Terrace capacity stacks with a floating worker")
 	sim.float_station = 1
 	_tick(sim, 480)
-	_check(sim.stopped and sim.milestone == {"stays": 12, "average": 93.25, "terrace": true, "cash": 1120}
-		and _scores(sim).slice(4) == [100, 99, 95, 91, 100, 99, 95, 91],
-		"Standard full success gives 12 stays, 93.25 rating and $1120, with remaining dining wait penalties")
+	_check(sim.stopped and sim.milestone == {"stays": 12, "average": 1145.0 / 12.0, "terrace": true, "cash": 1120}
+		and _scores(sim).slice(4) == [100, 100, 98, 94, 100, 100, 98, 94],
+		"Standard full success gives 12 stays, 95.42 rating and $1120, including activities and dining wait penalties")
 	var milestone := sim.milestone.duplicate()
 	var before := sim.snapshot()
 	_tick(sim, 40)
@@ -402,10 +402,12 @@ func _test_v1_slot() -> void:
 		and game.simulation.float_station == 1 and not -1 in game.simulation.rooms,
 		"Original release save restores Day 1 00:58, $620, Standard, buffet staffing and four occupied rooms")
 	var loaded: Dictionary = game.simulation.snapshot()
-	for key in ["mode", "layout", "pending_layout", "pending_reserve", "booked_count", "meal_version"]:
+	for key in ["mode", "layout", "pending_layout", "pending_reserve", "booked_count", "meal_version", "leisure_version"]:
 		loaded.erase(key)
 	for family in loaded.families:
 		for key in ["table_id", "dining_wait", "legacy_meal"]:
+			family.erase(key)
+		for key in Sim.LEISURE_DEFAULTS:
 			family.erase(key)
 	_check(loaded == saved.get("simulation") and game.simulation.mode == "regular"
 		and game.simulation.layout.readiness().ok and game.camera.snapshot() == home

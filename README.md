@@ -8,7 +8,7 @@ A compact resort-management game. Welcome families, set package prices, balance 
 
 [Download the latest Windows build](https://github.com/dgeller97/All-Inclusive/releases/latest/download/AllInclusive-Windows.zip), extract the ZIP, and double-click `AllInclusive.exe`. No Godot installation is required. [Release notes and checksums](https://github.com/dgeller97/All-Inclusive/releases/latest) are available on GitHub. Use the Windows ZIP asset, not GitHub's automatically generated source-code archives.
 
-The current local development build is Revision 6, with interactive restaurant visits, exterior views, building names, customizable finishes and landscape editing. The published GitHub release remains v0.3.0 until a new release is uploaded.
+The current local development build is Revision 7, with usable beach amenities, volleyball, beach bars and outdoor entertainment, alongside restaurant interactions, building customization and landscape editing. The published GitHub release remains v0.3.0 until a new release is uploaded.
 
 Extract `build/AllInclusive-Windows.zip` and open `AllInclusive.exe`. From the project folder, you can also open `build/windows/AllInclusive.exe` directly. The game runs on 64-bit Windows and includes its assets.
 
@@ -26,6 +26,24 @@ Open the resort to begin a three-day run. At 1×, the resort clock runs for 12 m
 Windows stores the save and audio preference under `%APPDATA%\Godot\app_userdata\All Inclusive`.
 
 ## Design your resort
+
+### Beach activities and entertainment
+
+New games include a small starter leisure area. After their pool visit, families can relax at beach loungers or play volleyball, then stop for an included drink. Later in the day, guests can watch a performance at the outdoor stage. Venues use the furniture you actually place, with reachable access and limited capacity. Full or unreachable optional venues are skipped so families can still finish their holiday.
+
+Open **Build → Landscape → Amenities** to add venues, then Select to move or rotate them and Bulldoze to remove them. Regular construction costs are $40 for a beach lounge, $100 for a volleyball court, $100 for a beach bar and $120 for a stage. Developer construction is free. Starter amenities have no demolition refund; purchased amenities use the usual half-cost refund. You can place additional bars or activities around the resort.
+
+Each distinct activity a family completes adds one satisfaction point, capped at three per stay. Reviews show the activity bonus. Guest activities are included in the package, with no extra per-drink charge. Reservations and activity progress save with the run. Existing saves keep their layouts and can add the new venues through Build.
+
+Open **Leisure** in the icon dock to see venue capacity and availability. Stage visits begin at **03:00 on the simulation's four-minute day clock**. Use Home to return to a view that includes the beach venues, then zoom in to watch the activities.
+
+The usable beach remains on dry land. The original coast and water remain fixed; red flags close the ocean, while dry beach activities remain available. Ocean swimming and water sports are not simulated in this revision.
+
+The amenity choices draw on [official resort research](docs/resort-research.md), including beach sports, oceanside drinks and live entertainment.
+
+![Generated preview of beach loungers, volleyball, bar service and stage entertainment](docs/screenshots/beach-leisure-preview.png)
+
+This preview is generated from the game's drawing code and guest states; it is not a native gameplay capture.
 
 ### Restaurant visits
 
@@ -89,6 +107,7 @@ $godot = ".\.tools\godot\Godot_v4.7.2-stable_win64_console.exe"
 & $godot --headless --path . --script res://tests/building_identity_test.gd
 & $godot --headless --path . --script res://tests/building_renderer_test.gd
 & $godot --headless --path . --script res://tests/dining_contract_test.gd
+& $godot --headless --path . --script res://tests/beach_contract_test.gd
 & $godot --headless --path . --script res://tests/construction_transactions_test.gd
 & $godot --headless --path . --script res://tests/landscape_model_test.gd
 & $godot --headless --path . -- --smoke-test
@@ -107,4 +126,4 @@ The design and production notes are in `docs/`.
 
 The starter resort has four bedrooms and three service areas. You can build up to eight bedrooms and one reception, buffet, and pool. Bookings remain capped at four families per day (three on Premium), limited by the number of usable bedrooms. Families follow a repeating daily schedule and swim in the resort pool. Pricing and staffing affect revenue and reviews. Plants and benches are decorative; multiple floors, multiple copies of service buildings, and a larger progression system are deferred.
 
-See `docs/revision-6.md` for restaurant interactions, `docs/revision-5.md` for building appearance, `docs/revision-4.md` for landscape editing and `docs/revision-3.md` for the underlying construction system. Current validation uses headless checks; interactive desktop playtesting is paused at the user's request. The native Windows playthrough in `docs/native-playtest.md` covers the original first playable release only.
+See `docs/revision-7.md` for beach amenities, `docs/revision-6.md` for restaurant interactions, `docs/revision-5.md` for building appearance, `docs/revision-4.md` for landscape editing and `docs/revision-3.md` for the underlying construction system. Current validation uses headless checks; interactive desktop playtesting is paused at the user's request. The native Windows playthrough in `docs/native-playtest.md` covers the original first playable release only.

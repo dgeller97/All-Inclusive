@@ -38,6 +38,12 @@ const ASSET_CATALOG := {
 	"plant": {"label": "Plant", "cost": 8, "size": [1, 1], "allowed": []},
 	"bench": {"label": "Bench", "cost": 15, "size": [3, 1], "allowed": []},
 }
+const STARTER_AMENITIES := [
+	{"kind": "beach_lounge", "cell": [60, 14]},
+	{"kind": "volleyball", "cell": [45, 9], "rotation": 1},
+	{"kind": "beach_bar", "cell": [52, 32]},
+	{"kind": "stage", "cell": [40, 32]},
+]
 static var _next_id := 1
 var buildings: Array[Dictionary] = []
 var assets: Array[Dictionary] = []
@@ -52,9 +58,11 @@ var _rooms_cached := false
 var _stations_cache := {}
 var _dining_cache: Array[Dictionary] = []
 var _dining_cached := false
+var _amenities_cache: Array[Dictionary] = []
+var _amenities_cached := false
 
 
-func _init() -> void:
+func _init(with_starter_amenities: bool = true) -> void:
 	_shore = SHORE.get_image()
 	var default_props := landscape.props.duplicate(true)
 	landscape.props.clear()
@@ -67,6 +75,11 @@ func _init() -> void:
 	add_asset("counter", buffet.id, Vector2i(2, 2))
 	add_asset("table", buffet.id, Vector2i(9, 3))
 	add_building("pool", Rect2(312, 160, 144, 80))
+	if with_starter_amenities:
+		for i in range(STARTER_AMENITIES.size()):
+			var prop: Dictionary = STARTER_AMENITIES[i].duplicate(true)
+			prop.merge({"id": 1100000 + i, "offset": [4, 4], "rotation": 0, "variant": 0, "paid_cost": 0})
+			default_props.append(prop)
 	_install_default_props(default_props, false)
 	# Starter hotel is owned, but carries no refundable construction expenditure.
 
@@ -76,7 +89,7 @@ func snapshot() -> Dictionary:
 
 
 func duplicate_layout() -> RefCounted:
-	var copy = get_script().new()
+	var copy = get_script().new(false)
 	copy.restore(snapshot())
 	return copy
 
@@ -217,6 +230,8 @@ func _invalidate() -> void:
 	_stations_cache.clear()
 	_dining_cache.clear()
 	_dining_cached = false
+	_amenities_cache.clear()
+	_amenities_cached = false
 
 
 func building_rect(building: Dictionary) -> Rect2:
@@ -590,6 +605,56 @@ func _table_seats(table: Dictionary, counter: Vector2, used_seats: Dictionary) -
 		if (inside.has_point(aisle) or aisle == door_point(building)) and not used_seats.has(aisle) and not route(seat, aisle).is_empty():
 			return [seat, aisle]
 	return []
+
+
+func amenities(kind: String = "") -> Array[Dictionary]:
+	if not _amenities_cached:
+		_amenities_cached = true
+		for prop in landscape.props:
+			var info: Dictionary = Landscape.PROP_CATALOG[prop.kind]
+			if not info.has("capacity"):
+				continue
+			var bounds := prop_rect(prop)
+			var access := _amenity_access(bounds)
+			if access != Vector2.INF:
+				_amenities_cache.append({
+					"id": prop.id, "kind": prop.kind, "point": access, "rect": bounds,
+					"capacity": info.capacity, "rotation": prop.rotation,
+				})
+		_amenities_cache.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.id < b.id)
+	var found: Array[Dictionary] = []
+	for amenity in _amenities_cache:
+		if kind.is_empty() or amenity.kind == kind:
+			found.append(amenity.duplicate())
+	return found
+
+
+func amenity_by_id(id: int) -> Dictionary:
+	for amenity in amenities():
+		if amenity.id == id:
+			return amenity
+	return {}
+
+
+func _amenity_access(bounds: Rect2) -> Vector2:
+	var footprint := Rect2i(_cell(bounds.position), Vector2i(bounds.size / GRID))
+	var preferred := Vector2(bounds.get_center().x, bounds.end.y + GRID * 0.5)
+	var candidates: Array[Vector2] = []
+	for x in range(footprint.position.x, footprint.end.x):
+		candidates.append(landscape.cell_rect(Vector2i(x, footprint.end.y)).get_center())
+		candidates.append(landscape.cell_rect(Vector2i(x, footprint.position.y - 1)).get_center())
+	for y in range(footprint.position.y, footprint.end.y):
+		candidates.append(landscape.cell_rect(Vector2i(footprint.position.x - 1, y)).get_center())
+		candidates.append(landscape.cell_rect(Vector2i(footprint.end.x, y)).get_center())
+	candidates.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+		return a.distance_squared_to(preferred) < b.distance_squared_to(preferred)
+	)
+	for point in candidates:
+		# A service door can be traversable, but an outdoor venue may not use it
+		# or otherwise put its entrance inside a building.
+		if building_at(point).is_empty() and not route(ENTRY, point).is_empty():
+			return point
+	return Vector2.INF
 
 
 func readiness() -> Dictionary:

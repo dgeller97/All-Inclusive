@@ -5,6 +5,7 @@ const Sim = preload("res://scripts/simulation.gd")
 const Layout = preload("res://scripts/layout_model.gd")
 const BuildingRenderer = preload("res://scripts/building_renderer.gd")
 const LandscapeRenderer = preload("res://scripts/landscape_renderer.gd")
+const AmenityArt := preload("res://scripts/amenity_renderer.gd")
 const WORLD_BOUNDS := Layout.WORLD_BOUNDS
 const BASE_PATH := "res://assets/art/resort.png"
 const PEOPLE_PATH := "res://assets/art/people.png"
@@ -18,6 +19,10 @@ const FOOD := Color("#d86d48")
 const GARNISH := Color("#8fa658")
 const CHAIR_WOOD := Color("#945744")
 const GUEST_SKIN := [Color("#d5936c"), Color("#a86d53"), Color("#ebaa7c"), Color("#bb7d5e"), Color("#c38363")]
+const BEACH_BALL := Color("#ed924d")
+const DRINK_CUP := Color("#96e2db")
+const SHOW_LAMP := Color("#ffec9a")
+const SHOW_DUSK := Color("#40395538")
 
 var simulation: Sim
 var time := 0.0
@@ -37,6 +42,7 @@ var room_points: Array[Vector2] = []
 var station_points: Array[Vector2] = []
 var station_approaches: Array[PackedVector2Array] = []
 var dining_tables := {}
+var amenities := {}
 var counter_points: Array[Vector2] = []
 var counter_trays: Array[Vector2] = []
 var table_wait_points: Array[Vector2] = []
@@ -73,7 +79,8 @@ func _ready() -> void:
 func present(resort: Sim, visual_time: float, draft: Layout = null, layout_changed: bool = false,
 		show_exteriors: bool = false, inspect_ceiling_id: int = -1) -> void:
 	var layout := draft if draft else resort.layout
-	var changed := layout_changed or visible_layout != layout
+	var landscape_changed := visible_layout != layout or landscape_revision != layout.landscape.revision
+	var changed := layout_changed or landscape_changed
 	var in_design := draft != null
 	var exterior := show_exteriors and not in_design
 	var state_changed := simulation != resort or time != visual_time or viewing_draft != in_design or exterior_view != exterior
@@ -86,7 +93,7 @@ func present(resort: Sim, visual_time: float, draft: Layout = null, layout_chang
 	actors.visible = not viewing_draft
 	signs.visible = not viewing_draft
 	var landscape_time := float(simulation.day - 1) * Sim.DAY_LENGTH + time
-	if visible_layout != layout or landscape_revision != layout.landscape.revision:
+	if landscape_changed:
 		landscape_revision = layout.landscape.revision
 		ocean.set_landscape(layout.landscape)
 	landscape_renderer.present(layout.landscape, landscape_time)
@@ -120,6 +127,9 @@ func _rebuild_actor_anchors(layout: Layout) -> void:
 		station_points.append(point)
 		station_approaches.append(layout.route(Layout.ENTRY, point))
 	_rebuild_dining_anchors(layout)
+	amenities.clear()
+	for amenity in layout.amenities():
+		amenities[amenity.id] = amenity
 
 
 func _rebuild_dining_anchors(layout: Layout) -> void:
@@ -231,6 +241,7 @@ func _draw_actors() -> void:
 	if not simulation or visible_layout != simulation.layout or viewing_draft:
 		return
 	var sprites: Array[Dictionary] = []
+	var in_use := {}
 	for station in range(3):
 		sprites.append({"point": _approach(station, 1), "row": 3, "frame": 0, "facing": true})
 	sprites.append({"point": _approach(simulation.float_station, 2), "row": 3, "frame": 0, "facing": false})
@@ -240,6 +251,11 @@ func _draw_actors() -> void:
 		var pose := _pose(family)
 		sprites.append(_guest_sprite(family, pose, false))
 		sprites.append(_guest_sprite(family, pose, true))
+		if family.phase == "leisure" and amenities.has(family.amenity_id):
+			in_use[family.amenity_id] = amenities[family.amenity_id]
+	for amenity: Dictionary in in_use.values():
+		if amenity.kind == "stage":
+			_draw_stage_show(amenity)
 	for sprite in sprites:
 		if sprite.get("meal", "") == "seated" and actor_visible(sprite.point) and actor_visible(sprite.plate):
 			_draw_plate(sprite.plate, true)
@@ -247,6 +263,9 @@ func _draw_actors() -> void:
 	for sprite in sprites:
 		if actor_visible(sprite.point):
 			_draw_actor(sprite)
+	for amenity: Dictionary in in_use.values():
+		if amenity.kind == "volleyball":
+			_draw_volleyball(amenity)
 
 
 func _guest_sprite(family: Dictionary, pose: Dictionary, child: bool) -> Dictionary:
@@ -260,6 +279,10 @@ func _guest_sprite(family: Dictionary, pose: Dictionary, child: bool) -> Diction
 		"meal": pose.get("meal", ""),
 		"plate": pose.get("child_plate" if child else "adult_plate", Vector2.INF),
 		"meal_age": time - float(family.since),
+		"leisure": pose.get("leisure", ""),
+		"leisure_age": time - float(family.since),
+		"leisure_slot": family.get("leisure_slot", -1),
+		"drink_source": pose.get("child_pickup" if child else "adult_pickup", Vector2.INF),
 	}
 
 
@@ -273,6 +296,8 @@ func _draw_actor(actor: Dictionary) -> void:
 	var row: int = actor.row
 	var meal: String = actor.get("meal", "")
 	var seated := meal == "seated"
+	var leisure: String = actor.get("leisure", "")
+	var resting := leisure == "beach_lounge" or leisure == "stage"
 	var child := row == 4
 	var facing := 1.0 if actor.facing else -1.0
 	if swim:
@@ -292,7 +317,7 @@ func _draw_actor(actor: Dictionary) -> void:
 			source.position.y += 6 if row == 4 else 0
 			source.size.y = 12
 			destination = Rect2(foot - Vector2(10, 11), Vector2(20, 12))
-		elif seated:
+		elif seated or resting:
 			# Tight source bounds keep the head and shirt readable at sitting height.
 			var top := 7 if child else 1
 			source.position += Vector2(5, top)
@@ -310,6 +335,8 @@ func _draw_actor(actor: Dictionary) -> void:
 		_actor_block(Rect2(foot - Vector2(2, height), Vector2(4, 4)), GUEST_SKIN[row])
 	if not meal.is_empty():
 		_draw_meal_action(actor, foot, facing, child, GUEST_SKIN[actor.row])
+	if not leisure.is_empty():
+		_draw_leisure_action(actor, foot, facing, child)
 
 
 func _draw_chair(foot: Vector2, facing: float, child: bool) -> void:
@@ -353,6 +380,82 @@ func _draw_meal_action(actor: Dictionary, foot: Vector2, facing: float, child: b
 		_actor_block(Rect2(hand + Vector2(-1, 2), Vector2(3, 1)), skin)
 
 
+func _draw_leisure_action(actor: Dictionary, foot: Vector2, facing: float, child: bool) -> void:
+	var skin: Color = GUEST_SKIN[actor.row]
+	var age: float = actor.leisure_age
+	match actor.leisure:
+		"beach_lounge":
+			var y := -2 if child else -3
+			_actor_block(Rect2(foot + Vector2(facing * 3 - 2, y), Vector2(5, 2)), Color("#616a83"))
+			_actor_block(Rect2(foot + Vector2(facing * 5 - 1, y + 1), Vector2(3, 2)), skin)
+		"volleyball":
+			var ready := -maxf(0.0, sin(time * TAU * 0.6 + actor.leisure_slot)) * 7.0
+			var reach := Vector2(facing * 4, (-5 if child else -7) + roundf(ready))
+			var elbow := foot + Vector2(facing * 3, -5 if child else -8)
+			var hand := foot + reach
+			_actor_block(Rect2(elbow - Vector2.ONE, Vector2(3, 3)), OUTLINE)
+			_actor_block(Rect2(Vector2(hand.x - 1, minf(hand.y, elbow.y)), Vector2(2, absf(hand.y - elbow.y) + 2)), skin)
+			_actor_block(Rect2(hand - Vector2(1, 0), Vector2(3, 2)), skin)
+		"beach_bar":
+			var sip := roundf(3.0 * maxf(0.0, sin((age + (0.7 if child else 0.0)) * 2.2)))
+			var hand := foot + Vector2(facing * 5, (-5 if child else -7) - sip)
+			var pickup: Vector2 = actor.drink_source
+			if pickup.is_finite():
+				hand = pickup.lerp(hand, clampf(age / 0.75, 0.0, 1.0)).round()
+			_actor_block(Rect2(hand + Vector2(-2, 0), Vector2(4, 2)), skin)
+			_actor_block(Rect2(hand + Vector2(-2, -4), Vector2(4, 5)), OUTLINE)
+			_actor_block(Rect2(hand + Vector2(-1, -3), Vector2(2, 3)), DRINK_CUP)
+			_actor_block(Rect2(hand + Vector2(facing, -5), Vector2.ONE), FOOD)
+			_actor_block(Rect2(hand + Vector2(-2, -4), Vector2(4, 1)), PLATE_RIM)
+		"stage":
+			var clap := 1 if sin(age * 10.0 + actor.leisure_slot) > 0.0 else 0
+			var hand := foot + Vector2(facing * (3 + clap), -5 if child else -7)
+			_actor_block(Rect2(hand - Vector2.ONE, Vector2(3, 2)), skin)
+			_actor_block(Rect2(hand + Vector2(facing * 2, 0), Vector2.ONE), skin)
+
+
+func _draw_volleyball(amenity: Dictionary) -> void:
+	var arc := fposmod(time * 0.68, 2.0)
+	var flight := 1.0 - absf(arc - 1.0)
+	var ground := AmenityArt.at(amenity, Vector2(lerpf(21.0, 59.0, flight), lerpf(19.0, 38.0, flight))).round()
+	var ball := ground - Vector2(0, 12 + roundf(sin(flight * PI) * 9.0))
+	_actor_block(Rect2(ground - Vector2(2, 0), Vector2(4, 2)), Color("#7b555059"))
+	_actor_block(Rect2(ball - Vector2(2, 1), Vector2(5, 3)), OUTLINE)
+	_actor_block(Rect2(ball - Vector2(1, 2), Vector2(3, 5)), OUTLINE)
+	_actor_block(Rect2(ball - Vector2(1, 1), Vector2(3, 3)), BEACH_BALL)
+	_actor_block(Rect2(ball - Vector2(1, 1), Vector2(2, 1)), PLATE_RIM)
+
+
+func _draw_stage_show(amenity: Dictionary) -> void:
+	var corner := AmenityArt.at(amenity, Vector2(4, 2)).min(AmenityArt.at(amenity, Vector2(60, 23)))
+	var stage_end := AmenityArt.at(amenity, Vector2(4, 2)).max(AmenityArt.at(amenity, Vector2(60, 23)))
+	var beat := int(time * 5.0)
+	_actor_block(Rect2(corner - Vector2(0, 14), stage_end - corner + Vector2(0, 13)), SHOW_DUSK)
+	var lamps := [corner.x + 5.0, stage_end.x - 8.0]
+	for index in 2:
+		var lamp := Vector2(lamps[index], corner.y - 11.0)
+		var lit := posmod(beat / 2 + index, 2) == 0
+		var color := SHOW_LAMP if lit else DRINK_CUP
+		_actor_block(Rect2(lamp, Vector2(3, 2)), color)
+		for stripe in range(3):
+			var glow := Color(color, 0.13 - stripe * 0.025)
+			_actor_block(Rect2(lamp + Vector2(-stripe, 2 + stripe * 4), Vector2(3 + stripe * 2, 4)), glow)
+	var foot := AmenityArt.at(amenity, Vector2(32, 14)).round()
+	foot.y -= 3
+	var move := posmod(beat, 4) - 1
+	foot.x += move
+	_actor_block(Rect2(foot + Vector2(-6, -1), Vector2(12, 2)), Color("#48374756"))
+	_draw_actor({"point": foot, "row": 3, "frame": posmod(beat, 4), "facing": true})
+	var mic := foot + Vector2(6, -10 - (1 if beat % 2 == 0 else 0))
+	_actor_block(Rect2(mic + Vector2(-3, 2), Vector2(3, 2)), GUEST_SKIN[3])
+	_actor_block(Rect2(mic + Vector2(0, 1), Vector2(1, 4)), OUTLINE)
+	_actor_block(Rect2(mic - Vector2(1, 0), Vector2(3, 2)), DRINK_CUP)
+	var note := foot + Vector2(10 + beat % 2 * 2, -18 - beat % 3)
+	_actor_block(Rect2(note, Vector2(1, 5)), SHOW_LAMP)
+	_actor_block(Rect2(note - Vector2(2, -4), Vector2(3, 2)), SHOW_LAMP)
+	_actor_block(Rect2(note, Vector2(3, 1)), SHOW_LAMP)
+
+
 func _actor_block(rect: Rect2, color: Color) -> void:
 	actors.draw_rect(rect, color)
 
@@ -365,6 +468,10 @@ func _pose(family: Dictionary) -> Dictionary:
 	var meal := _meal_pose(family)
 	if not meal.is_empty():
 		return meal
+	if family.phase in Sim.LEISURE_PHASES:
+		var leisure := _leisure_pose(family)
+		if not leisure.is_empty():
+			return leisure
 	var room := room_points[maxi(family.room, 0)]
 	var reception := station_points[0]
 	var buffet := station_points[1]
@@ -415,6 +522,86 @@ func _pose(family: Dictionary) -> Dictionary:
 	result.frame = int(maxf(age, 0.0) * 7.0) % 4 if progress < 1.0 else 0
 	result.swim = false
 	return result
+
+
+func _leisure_pose(family: Dictionary) -> Dictionary:
+	var amenity: Dictionary = amenities.get(family.amenity_id, {})
+	if amenity.is_empty():
+		return {}
+	var slot: int = family.leisure_slot
+	var activity := _amenity_pose(amenity, slot)
+	if family.phase == "leisure":
+		return activity
+	var room := room_points[maxi(family.room, 0)]
+	var origin := station_points[2]
+	var target: Vector2 = amenity.point
+	var departure := {}
+	var arrival := activity
+	if family.phase == "from_leisure":
+		origin = amenity.point
+		target = room
+		departure = activity
+		arrival = {}
+	elif family.leisure_step == 3:
+		origin = room
+	elif amenities.has(family.leisure_origin_id):
+		var previous: Dictionary = amenities[family.leisure_origin_id]
+		origin = previous.point
+		departure = _amenity_pose(previous, family.get("leisure_origin_slot", 0))
+	var path := visible_layout.route(origin, target)
+	if path.is_empty():
+		return {}
+	var duration := maxf(1.0, float(family.until - family.since))
+	var progress := clampf((time - float(family.since)) / duration, 0.0, 1.0)
+	var adult_path := path.duplicate()
+	var child_path := path.duplicate()
+	if not departure.is_empty():
+		adult_path.insert(0, departure.point)
+		child_path.insert(0, departure.child)
+	if not arrival.is_empty():
+		adult_path.append(arrival.point)
+		child_path.append(arrival.child)
+	var adult := _follow_path(adult_path, progress)
+	var child := _follow_path(child_path, progress - sin(PI * progress) * 0.035)
+	return {
+		"point": adult.point, "child": child.point, "facing": adult.facing, "child_facing": child.facing,
+		"frame": int(maxf(0.0, time - family.since) * 7.0) % 4 if progress < 1.0 else 0, "swim": false,
+	}
+
+
+func _amenity_pose(amenity: Dictionary, slot: int) -> Dictionary:
+	slot = clampi(slot, 0, amenity.capacity - 1)
+	var adult_local := Vector2.ZERO
+	var child_local := Vector2.ZERO
+	var focus_local := Vector2.ZERO
+	match amenity.kind:
+		"beach_lounge":
+			adult_local = Vector2(10, 7 + slot * 12)
+			child_local = Vector2(23, 9 + slot * 12)
+			focus_local = Vector2(28, 9 + slot * 12)
+		"volleyball":
+			adult_local = Vector2(23, 25 + slot * 18)
+			child_local = Vector2(58, 22 + slot * 18)
+			focus_local = Vector2(40, 29)
+		"beach_bar":
+			adult_local = Vector2(9 + slot * 23, 28)
+			child_local = Vector2(20 + slot * 23, 30)
+			focus_local = Vector2(24, 15)
+		"stage":
+			adult_local = Vector2(8 + slot * 15, 34)
+			child_local = Vector2(15 + slot * 15, 37)
+			focus_local = Vector2(32, 14)
+	var adult := AmenityArt.at(amenity, adult_local)
+	var child := AmenityArt.at(amenity, child_local)
+	var focus := AmenityArt.at(amenity, focus_local)
+	var pose := {
+		"point": adult, "child": child, "facing": focus.x >= adult.x, "child_facing": focus.x >= child.x,
+		"frame": 0, "swim": false, "leisure": amenity.kind,
+	}
+	if amenity.kind == "beach_bar":
+		pose.adult_pickup = AmenityArt.at(amenity, Vector2(adult_local.x, 17)) - Vector2(0, 3)
+		pose.child_pickup = AmenityArt.at(amenity, Vector2(child_local.x, 17)) - Vector2(0, 3)
+	return pose
 
 
 func _meal_pose(family: Dictionary) -> Dictionary:

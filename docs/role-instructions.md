@@ -26,6 +26,8 @@ For revision 5, use the same model roster with a building visual designer (rende
 
 For revision 6, the two specialist slots are the simulation/layout/core developer and dining map/visual specialist. Root owns a separate independent dining-contract test plus launch documentation and packaging. Keep the Astra/high PM and Sol/xhigh specialists, fixed coast, no computer use and tester break. New activity states must use real editable geometry and serializable reservations, with visual poses derived from the same state.
 
+For revision 7's autonomous expansion, retain the same roster with a model/UI/core developer and beach visual/map specialist. Root owns official-source research, a separate beach-contract test, packaging and Git. Target a coherent tested subset within the user's hour: four functional editable amenities, compatibility and artifact verification before optional polish. No computer use or native tester resumption.
+
 ## Planner
 
 Define the smallest coherent loop that satisfies the brief. Provide numeric defaults, pacing, state changes, controls and acceptance criteria. Highlight assumptions. Hand off a concrete contract rapidly; avoid expanding scope.

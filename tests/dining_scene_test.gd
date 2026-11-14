@@ -80,6 +80,7 @@ func _test_current_slot(game: Game) -> void:
 
 func _test_v5_migration(game: Game) -> void:
 	var old := Sim.new()
+	old.layout = Layout.new(false)
 	for second in range(64):
 		old.tick()
 	var buffet := old.layout.building_at(old.layout.station_point(1))
@@ -87,12 +88,15 @@ func _test_v5_migration(game: Game) -> void:
 	old.layout.set_building_finish(buffet.id, "floor", "tile")
 	var state := old.snapshot()
 	state.erase("meal_version")
+	state.erase("leisure_version")
 	state.families[0].merge({"phase": "to_pool", "since": 64, "until": 68, "slot": 0}, true)
 	state.families[1].merge({"phase": "service", "since": 54, "until": 72, "slot": 1}, true)
 	state.families[2].merge({"phase": "service", "since": 64, "until": 82, "slot": 0, "waits": [4, 2, 0]}, true)
 	for family in state.families:
 		family.erase("table_id")
 		family.erase("dining_wait")
+		for key in Sim.LEISURE_DEFAULTS:
+			family.erase(key)
 	var saved := {"version": Game.EXTERIOR_SAVE_VERSION, "simulation": state, "draft": {},
 		"elapsed": 0.5, "speed": 2, "exterior_view": true, "camera": game.camera.snapshot()}
 	_check(SaveSlot.write(saved), "Stage a pre-meal version 5 with active buffet and post-buffet travel")
@@ -108,7 +112,7 @@ func _test_v5_migration(game: Game) -> void:
 	game._save_run()
 	game._load_run()
 	_check(game.simulation.families[1].until == 72 and game.simulation.families[0].phase == "to_pool",
-		"Converted version 6 can immediately reload the migrated in-flight guests")
+		"Converted current save can immediately reload the migrated in-flight guests")
 	game.speed = 1
 	game.paused = false
 	game._process(7.5)

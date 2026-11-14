@@ -22,15 +22,18 @@ const ASSETS := {
 	"lounger": "Lounger", "umbrella": "Umbrella", "plant": "Plant", "bench": "Bench",
 }
 const CATEGORIES := {"buildings": "Buildings", "furniture": "Furniture", "landscape": "Landscape"}
-const LANDSCAPE_GROUPS := {"terrain": "Terrain", "path": "Paths", "scenery": "Scenery"}
+const LANDSCAPE_GROUPS := {"terrain": "Terrain", "path": "Paths", "scenery": "Scenery", "amenities": "Amenities"}
 const TERRAIN := {"grass": "Grass", "sand": "Sand", "dirt": "Dirt", "restore": "Restore"}
 const PATHS := {"stone": "Stone", "boardwalk": "Boardwalk", "erase": "Erase path"}
 const SCENERY := {"palm": "Palm", "bush": "Shrub", "rock": "Rock", "scenery_bench": "Bench", "beach_flag": "Beach flag"}
+const AMENITIES := {"beach_lounge": "Lounge", "volleyball": "Volleyball", "beach_bar": "Beach bar", "stage": "Stage"}
 const TOOL_COLORS := {
 	"grass": Color("#a7c57a"), "sand": Color("#f9d894"), "dirt": Color("#d59c73"),
 	"stone": Color("#cbd1d6"), "boardwalk": Color("#e5ac75"),
 	"palm": Color("#a7c57a"), "bush": Color("#a7c57a"), "rock": Color("#cbd1d6"),
 	"beach_flag": Color("#ffa78d"),
+	"beach_lounge": Color("#f6c88a"), "volleyball": Color("#ffd698"),
+	"beach_bar": Color("#8ed6c6"), "stage": Color("#f5a7ae"),
 }
 
 
@@ -64,6 +67,10 @@ class PixelIcon extends Control:
 		"bush": ["............", "............", ".....##.....", "....####....", "..#######...", ".##########.", ".###.######.", "#########.##", "############", ".##########.", "............", "............"],
 		"rock": ["............", "............", "............", "....####....", "...######...", "..########..", ".########.#.", ".##########.", ".##########.", "............", "............", "............"],
 		"beach_flag": ["............", "...######...", "...########.", "...########.", "...######...", "...##.......", "...##.......", "...##.......", "...##.......", "..####......", "............", "............"],
+		"beach_lounge": ["............", "....####....", "..########..", ".##########.", ".....##.....", ".....##.....", "..##.##.....", "..###.......", "...#######..", "...#######..", "...#.....#..", "............"],
+		"volleyball": ["............", ".....##.....", "....####....", ".....##.....", ".#........#.", ".##########.", ".#.#.#.#..#.", ".##########.", ".#.#.#.#..#.", ".#........#.", ".#........#.", "............"],
+		"beach_bar": ["............", "........##..", ".......##...", "......##....", "..########..", "...######...", "....####....", ".....##.....", ".....##.....", "...######...", "............", "............"],
+		"stage": ["............", ".##########.", ".#.#.##.#.#.", ".#........#.", ".#........#.", ".#...##...#.", ".#..#..#..#.", ".#...##...#.", ".##########.", "############", "............", "............"],
 	}
 	var symbol := ""
 	var tint := Color("#f3c881")
@@ -179,7 +186,7 @@ func refresh(data: Dictionary) -> void:
 	_move.visible = in_landscape
 	_move.disabled = not data.get("can_move", false)
 	_move.get_node("Icon").set_tint(MUTED if _move.disabled else (INK if tool == "move" else GOLD))
-	_rotate.visible = section in ["furniture", "scenery"]
+	_rotate.visible = section in ["furniture", "scenery", "amenities"]
 	_rotate.disabled = not data.get("can_rotate", false)
 	_rotate.accessibility_name = "Rotate clockwise (R), %d degrees" % turn
 	_rotate.get_node("Icon").set_tint(MUTED if _rotate.disabled else GOLD)
@@ -331,13 +338,16 @@ func _tool_instruction(data: Dictionary, rotation: int) -> String:
 				return "Restore · Left-drag to reset the original ground and paths."
 			return "%s · Left-drag on dry land. Release to finish the stroke." % (TERRAIN.get(id) if TERRAIN.has(id) else PATHS[id])
 		"prop":
+			var amenity: Dictionary = Layout.Landscape.PROP_CATALOG.get(id, {})
+			if amenity.has("capacity"):
+				return "%s · Left-click on dry land. Rotation %d°." % [amenity.label, rotation]
 			return "%s · Left-click to place outdoors. Rotation %d°." % [SCENERY[id], rotation]
 		"move":
-			return "Move · Left-click a new location for the selected scenery."
+			return "Move · Left-click a new location for the selected outdoor object."
 		"bulldoze":
-			return "Bulldoze · Left-click outdoor scenery to remove it." if landscape else "Bulldoze · Left-click a building or furnishing to remove it."
+			return "Bulldoze · Left-click an outdoor object to remove it." if landscape else "Bulldoze · Left-click a building or furnishing to remove it."
 	if landscape:
-		return "Select · Left-click outdoor scenery, then use Move or Bulldoze."
+		return "Select · Left-click an outdoor object, then use Move or Bulldoze."
 	if data.get("category") == "buildings":
 		return "Select · Click a building, then open Building settings."
 	return "Select · Left-click a building or piece of furniture to inspect it."
@@ -429,17 +439,18 @@ func _select_finish(index: int, surface: String, field: OptionButton) -> void:
 func _build_palette() -> void:
 	_palette = _surface("DesignPalette", PALETTE_SIZE)
 	_add_choices(_category_buttons, CATEGORIES, 12, 104, "category")
-	_add_choices(_landscape_buttons, LANDSCAPE_GROUPS, 351, 76, "landscape_group")
-	_label(_palette, Rect2(588, 6, 400, 24), "Middle-drag to pan · Wheel to zoom · Esc or right-click to cancel", 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	_add_choices(_landscape_buttons, LANDSCAPE_GROUPS, 343, 74, "landscape_group")
+	_label(_palette, Rect2(660, 6, 328, 24), "Middle-drag pan · Wheel zoom · Esc cancels", 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	_add_tool("select", "Select", 12, "tool", "select", "Select and inspect an existing object.")
 	_add_tool("bulldoze", "Bulldoze", 86, "bulldoze", null, "Remove an object from the draft.")
-	_move = _add_tool("move", "Move", 160, "move", null, "Move selected outdoor scenery.")
+	_move = _add_tool("move", "Move", 160, "move", null, "Move the selected outdoor object.")
 	_divider(_palette, Rect2(237, 37, 1, 42))
 	_add_catalog(BUILDINGS, "buildings", "building")
 	_add_catalog(ASSETS, "furniture", "asset")
 	_add_catalog(TERRAIN, "terrain", "terrain")
 	_add_catalog(PATHS, "path", "path")
 	_add_catalog(SCENERY, "scenery", "prop")
+	_add_catalog(AMENITIES, "amenities", "prop")
 	_brush_label = _label(_palette, Rect2(686, 35, 210, 20), "Brush size", 13, GOLD)
 	for index in range(3):
 		var brush_size := 1 + index * 2
@@ -472,6 +483,9 @@ func _add_catalog(catalog: Dictionary, section: String, action: String) -> void:
 		var value: String = id
 		var request := action
 		var help := words
+		if section == "amenities":
+			var amenity: Dictionary = Layout.Landscape.PROP_CATALOG[id]
+			help = "%s · $%d · %d families" % [amenity.label, amenity.cost, amenity.capacity]
 		match id:
 			"restore":
 				request = "restore"

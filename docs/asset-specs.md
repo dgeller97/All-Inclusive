@@ -1,5 +1,9 @@
 # Asset integration contract
 
+## Revision 7 outdoor amenities
+
+`scripts/amenity_renderer.gd` generates original pixel frames for the beach lounge, volleyball court, beach bar and stage. Ground furniture/markings rotate with placement while posts, canopies, nets and lighting retain their upright presentation. Landscape drawing and editor ghosts share those frames. The map derives activity poses, volleyball motion, cups, stage performer/lights and audience slots from actual saved property reservations. See `beach-visuals.md` and `revision-7.md`. `docs/screenshots/beach-leisure-preview.png` is the accepted CPU-generated actual-phase contact sheet, explicitly not a native capture.
+
 ## Revision 6 restaurant interaction
 
 `resort_map.gd` derives food collection, plate carrying, table approach, seated eating and departure from actual simulation phases and `Layout.dining_tables()` records. Seated sprites use compact cropped silhouettes, chair/knee details and animated hands; plates remain visible above the seated bodies. Meal details use the same exterior/ceiling concealment as guests. No furniture is baked into a background or assigned a fake fixed dining location. See `dining-visuals.md` for the reusable headless CPU preview/test and `revision-6.md` for reservations and timing.

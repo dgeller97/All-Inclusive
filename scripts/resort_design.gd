@@ -89,7 +89,7 @@ func choose(action: String, value: Variant) -> void:
 				"path":
 					tool = "path"
 					brush_value = "stone"
-				"scenery":
+				"scenery", "amenities":
 					tool = "select"
 		"tool":
 			tool = "select"
@@ -381,7 +381,7 @@ func _scenery_click(point: Vector2) -> bool:
 		selection = target
 		queue_redraw()
 	elif target.is_empty():
-		feedback = "Click outdoor scenery to bulldoze it."
+		feedback = "Click an outdoor object to bulldoze it."
 		feedback_valid = false
 	else:
 		var result := draft.remove_prop(target.id)

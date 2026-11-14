@@ -22,6 +22,10 @@ const PROP_CATALOG := {
 	"rock": {"label": "Rock", "cost": 3, "size": [1, 1], "visual": [-8, -8, 19, 14]},
 	"beach_flag": {"label": "Beach flag", "cost": 10, "size": [1, 1], "visual": [-24, -46, 52, 48]},
 	"bench": {"label": "Outdoor bench", "cost": 15, "size": [3, 1], "visual": [-4, -10, 24, 14]},
+	"beach_lounge": {"label": "Beach lounge", "cost": 40, "size": [4, 3], "capacity": 2, "overhang": 12},
+	"volleyball": {"label": "Volleyball court", "cost": 100, "size": [10, 7], "capacity": 2, "overhang": 10},
+	"beach_bar": {"label": "Beach bar", "cost": 100, "size": [6, 4], "capacity": 2, "overhang": 15},
+	"stage": {"label": "Evening stage", "cost": 120, "size": [8, 5], "capacity": 4, "overhang": 18},
 }
 static var _next_prop_id := 2000000
 static var _base_map: Image
@@ -125,6 +129,10 @@ func prop_rect(prop: Dictionary) -> Rect2:
 
 
 func prop_visual_rect(prop: Dictionary) -> Rect2:
+	if PROP_CATALOG[prop.kind].has("capacity"):
+		var footprint := prop_rect(prop)
+		var lift := Vector2(0, PROP_CATALOG[prop.kind].overhang)
+		return Rect2(footprint.position - lift, footprint.size + lift)
 	if prop.kind == "bench":
 		var footprint := prop_rect(prop)
 		return Rect2(footprint.position - Vector2(0, 6), footprint.size + Vector2(0, 6))
