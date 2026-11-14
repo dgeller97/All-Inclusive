@@ -1,5 +1,46 @@
 # Task board
 
+## Delivered revision 6
+
+| Task | Owner | State | Contract / evidence |
+| --- | --- | --- | --- |
+| Real buffet collection and dining reservations | Simulation/layout developer | Complete | Independent dining63 and scene37; actual tables, FIFO/exclusivity, separate waits and safe reloads |
+| Plate, seated-family and departure presentation | Dining visual specialist | Complete | CPU visual34 and preview inspection; seated plate readability and minimum-width badge fixed |
+| Compatibility and independent acceptance | Developer + root + PM | Complete | Management73+9, construction46+6, landscape35, appearance46, legacy saves and seeded schedules passed |
+| Windows executable and archive | Developer + root | Complete | Standalone headless smoke and matching archived executable verified; no native tester or Git publication |
+
+Current package: `build/AllInclusive-Windows.zip`, 41,274,527 bytes, SHA-256 `9A1796C03BD08A5BFDD601CAA2BA8DB0157086F48AADDDDB7943F343E4907ADB`. Executable: 111,362,472 bytes, SHA-256 `FB06BB622432D4E34A0AC29B56E887A027F7FCEE9FD52D3EB48DDECD8573C05C`. See `revision-6.md` for the contract and `revision-6-validation.md` for evidence. Specialists released; all authorized work complete. Native playtesting remains deferred.
+
+## Earlier revision 5 (superseded artifact)
+
+| Task | Owner | State | Contract / evidence |
+| --- | --- | --- | --- |
+| Building metadata and finish quotes | Root coordinator | Complete | Identity43, layout34, transactions24 and fixed-coast landscape63 passed |
+| Exterior architecture, signs and finishes | Building visual designer | Complete | Renderer95 passed; generated CPU preview inspected; pool unchanged |
+| Properties UI and game integration | UI/core developer | Complete | Routed appearance46, focused typing, draft/queue/reload, view preference and coast migration passed |
+| Headless acceptance and local package | Developer + root + PM | Complete | Management73+9, construction46+6, landscape35+12, legacy saves, portable smoke and archive hash verification passed |
+
+Historical package: 41,259,413 bytes, SHA-256 `2EB66FDBD4BF2B31BFA7392D923C01F972E383EDD7F24CD678BD5B81BB8855AD`. Executable: 111,347,672 bytes, SHA-256 `983556EB7432D4EC6EA26AB183484E8D4043FFE9BAE9AC7D88F784A38AAFB7B1`. See `revision-5.md` for behavior and `revision-5-validation.md` for historical acceptance evidence. Fixed coast retained; no native windows, tester resumption or Git publication.
+
+## Earlier fixed-coast correction (superseded artifact)
+
+The user's late scope answer supersedes the water-capable R4 assumption: keep the coast fixed. Model protection, Water-tool removal, transactional save feedback and re-export are complete. Land painting, paths and editable scenery remain. Root model 63, routed scene 35 + resume 12, construction 46 + 6, legacy queue 12 and v1/v2 four each passed. Standalone smoke and archive verification passed. No computer use, tester resumption or Git publication occurred.
+
+Historical package: 41,234,389 bytes, SHA-256 `E36BD1A6B4AD63F2473D1CAA9AA62C8DFB25AA587FE038E291856C25B1FF7D48`. Its executable is 111,322,896 bytes and matches `9EA6A5E2EF8F4F6B24F4B0C300A9E1144B231A74C56FEAA4FD95515B239CBA1E`. See `fixed-coast-validation.md`. Native playtesting remained deferred. These and earlier R4 artifact identities are historical and superseded by R5 above.
+
+## Earlier water-capable revision 4 (superseded)
+
+| Task | Owner | State | Dependency / evidence |
+| --- | --- | --- | --- |
+| Landscape data, costs and navigation | Root coordinator | Complete; model frozen | 58 landscape + 24 existing transaction checks pass, including route preference and legacy custom-layout migration |
+| Editable environment visuals and water clipping | Landscape visual designer | Complete | 306 checks pass; 67 editable default props and 214 connected path cells; no baked scenery/path remnants |
+| Compact landscape tools and core integration | UI/core developer | Complete and accepted | Final 33 routed landscape + 8 resume checks; R3 construction 46+6 and management 73 pass; legacy queue/draft defect fixed and 12 targeted checks pass |
+| Local Windows delivery | Developer + root + PM | Delivered and archive verified | Migration-fixed portable smoke and embedded executable hash pass; no push/release, visible windows or tester resumption |
+
+See `revision-4.md` for scope, ownership and current validation restrictions.
+
+Final R4 local archive: `build/AllInclusive-Windows.zip`, 41,233,212 bytes, SHA-256 `CE5986C08977D555503CDFB173D5B74C2A00B8022BFFF958831A64712A4F674A`. Its executable matches `BAE7E8DBBCDCBC2CEBF9EB032DF8043F8B5C9DC3DEC41B957E1C0DD6AD0545D4` (111,321,824 bytes). All authorized implementation and headless verification are complete. See `revision-4-validation.md`; native playtesting remains deferred, and the prior GitHub release was not changed.
+
 ## Delivered revision 3
 
 | Task | Owner | State | Dependency / evidence |

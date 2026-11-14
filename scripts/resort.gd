@@ -8,7 +8,9 @@ const SaveSlot = preload("res://scripts/save_slot.gd")
 const Layout = preload("res://scripts/layout_model.gd")
 const ResortDesign = preload("res://scripts/resort_design.gd")
 const DesignUI = preload("res://scripts/design_ui.gd")
-const SAVE_VERSION := 3
+const SAVE_VERSION := 6
+const EXTERIOR_SAVE_VERSION := 5
+const LANDSCAPE_SAVE_VERSION := 4
 const INK := Color("#382936")
 const FRAME := Color("#332633")
 const GOLD := Color("#e5bc78")
@@ -20,7 +22,6 @@ const MUTED := Color("#725d63")
 const GREEN := Color("#27645d")
 const WINE := Color("#754456")
 const SOFT_RED := Color("#8a3c3d")
-const STATION_NAMES := ["Reception", "Buffet", "Pool"]
 const SPEEDS := [1, 2, 4]
 const VIEW_SIZE := Vector2(1280, 720)
 
@@ -34,6 +35,7 @@ var saved_draft: Layout
 var speed := 1
 var elapsed := 0.0
 var paused := false
+var exterior_view := false
 var settings_open := false
 var started := false
 var muted := false
@@ -90,6 +92,8 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if not menu_mode.is_empty() and design and design.draft:
+		return
 	if design and design.draft:
 		_design_input(event)
 		return
@@ -174,6 +178,9 @@ func _on_ui_action(action: String, value: Variant) -> void:
 		"package": _set_package(value)
 		"staff": _set_station(value)
 		"build": _enter_design()
+		"building_view":
+			exterior_view = not exterior_view
+			_refresh()
 		"pause": _toggle_pause()
 		"speed": _set_speed(value)
 		"save": _save_run()
@@ -186,7 +193,8 @@ func _on_ui_action(action: String, value: Variant) -> void:
 
 
 func _present_map(layout_changed: bool = false) -> void:
-	map.present(simulation, float(simulation.second) + elapsed, design.draft, layout_changed)
+	var ceiling_id := design.settings_building_id if design.inspect_ceiling else -1
+	map.present(simulation, float(simulation.second) + elapsed, design.draft, layout_changed, exterior_view, ceiling_id)
 
 
 func _enter_design() -> void:
@@ -224,28 +232,44 @@ func _design_world_point(viewport_point: Vector2) -> Vector2:
 
 
 func _design_input(event: InputEvent) -> void:
+	if event is InputEventKey and design_ui.editing_building_name():
+		if event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+			design_ui.cancel_building_name_edit()
+			get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_ESCAPE:
-				design.cancel_operation()
+				if design.settings_building_id >= 0:
+					design.close_building_settings()
+				else:
+					design.cancel_operation()
 			KEY_R:
 				design.rotate_asset()
 			KEY_HOME:
+				if design.is_drawing():
+					design.cancel_operation()
 				camera.home()
 			_:
 				return
 		get_viewport().set_input_as_handled()
 		_refresh_design_ui()
 	elif event is InputEventMouseMotion:
-		design.move_pointer(_design_world_point(event.position))
+		design.move_pointer(_design_world_point(event.position), bool(event.button_mask & MOUSE_BUTTON_MASK_LEFT))
 		_refresh_design_ui()
 	elif event is InputEventMouseButton:
 		var point := _design_world_point(event.position)
-		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and point.is_finite():
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and (point.is_finite() or design.is_drawing()):
 			design.cancel_operation()
 			get_viewport().set_input_as_handled()
+		elif event.pressed and event.button_index in [MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			if design.is_drawing():
+				design.cancel_operation()
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			if not point.is_finite() and (event.pressed or not design.drag_origin.is_finite()):
+			if event.pressed and camera.is_dragging():
+				get_viewport().set_input_as_handled()
+				return
+			if not point.is_finite() and (event.pressed or not design.is_drawing()):
 				return
 			var edited := design.press(point) if event.pressed else design.release(point)
 			if edited:
@@ -263,21 +287,41 @@ func _on_camera_changed(_zoom: float) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT and design and design.draft:
-		if design.drag_origin.is_finite():
+		if design.is_drawing():
 			design.cancel_operation()
 			_refresh_design_ui()
 
 
 func _on_design_action(action: String, value: Variant) -> void:
-	if not design.draft:
+	if not design.draft or not menu_mode.is_empty():
 		return
 	_play_effect(&"click")
 	match action:
-		"tool", "building", "asset", "bulldoze":
+		"tool", "building", "asset", "bulldoze", "category", "landscape_group", "terrain", "path", "restore", "brush_size", "prop", "move":
 			design.choose(action, value)
 		"rotate":
 			design.rotate_asset()
+		"open_building_settings":
+			camera.cancel_drag()
+			design.open_building_settings()
+		"close_building_settings":
+			design.close_building_settings()
+		"inspect_ceiling":
+			design.toggle_ceiling_inspection()
+		"building_name":
+			var result := design.draft.set_building_name(design.settings_building_id, value)
+			if result.ok:
+				_present_map(true)
+			_refresh_design_ui()
+			design_ui.show_building_name_result(result)
+			return
+		"building_finish":
+			var result := design.draft.set_building_finish(design.settings_building_id, value.surface, value.choice)
+			if result.ok:
+				_present_map(true)
 		"apply":
+			if design.is_drawing():
+				design.cancel_operation()
 			var result := simulation.apply_construction(design.draft)
 			if result.ok:
 				saved_draft = null
@@ -291,6 +335,8 @@ func _on_design_action(action: String, value: Variant) -> void:
 			_leave_design()
 			return
 		"save_draft":
+			if design.is_drawing():
+				design.cancel_operation()
 			if _write_run(design.draft):
 				saved_draft = design.draft.duplicate_layout()
 				design.feedback = "Run and draft saved."
@@ -309,11 +355,18 @@ func _refresh_design_ui() -> void:
 	if not design.draft:
 		design_ui.refresh({"active": false})
 		return
+	var ceiling_id := design.settings_building_id if design.inspect_ceiling else -1
+	if map.ceiling_id != ceiling_id:
+		_present_map()
 	var result := simulation.construction_status(design.draft)
 	var placement := design.placement_feedback()
 	var state := {
-		"active": true, "tool": design.tool, "building": design.building, "asset": design.asset,
+		"active": true, "tool": design.tool, "selected_tool": design.selected_tool(),
+		"category": design.category, "landscape_group": design.landscape_group,
+		"brush_size": design.brush_size, "can_move": design.can_move(), "can_rotate": design.can_rotate(),
 		"rotation": design.asset_rotation, "feedback": placement.text, "selection": design.selection_text(),
+		"selected_building": design.selected_building(), "building_settings_open": design.settings_building_id >= 0,
+		"inspect_ceiling": design.inspect_ceiling,
 		"mode": simulation.mode, "cost": result.cost, "refund": result.refund, "cash": simulation.cash,
 		"can_apply": result.ok, "apply_reason": result.reason, "defer_apply": result.defer,
 		"apply_day": simulation.day + 1, "has_pending": simulation.pending_layout != null,
@@ -410,6 +463,7 @@ func _refresh_ui() -> void:
 	ui.refresh({
 		"simulation": simulation,
 		"paused": paused,
+		"exterior_view": exterior_view,
 		"speed": speed,
 		"muted": muted,
 		"can_load": SaveSlot.exists(),
@@ -432,7 +486,7 @@ func _set_package(index: int) -> void:
 func _set_station(index: int) -> void:
 	if simulation.float_station != index:
 		simulation.float_station = index
-		_toast("Float assigned to %s. Active service continues." % STATION_NAMES[index].to_lower())
+		_toast("Float assigned to %s. Active service continues." % simulation.station_name(index))
 	_refresh()
 
 
@@ -454,11 +508,11 @@ func _on_simulation_event(kind: StringName, details: Dictionary) -> void:
 		&"bookings":
 			_toast("%d families booked today." % details.count)
 		&"checkin":
-			_toast("Room %s checked in  ·  +$%d" % [char(65 + details.room), details.price])
+			_toast("%s checked in  ·  +$%d" % [simulation.room_name(details.room), details.price])
 		&"upgrade":
 			_toast("Pool terrace installed  ·  +1 pool slot")
 		&"review":
-			_toast("Room %s reviewed their stay  ·  %d/100" % [char(65 + details.room), details.score])
+			_toast("%s reviewed their stay  ·  %d/100" % [simulation.room_name(details.room), details.score])
 		&"day_close":
 			_toast("Day %d closed  ·  %d stays  ·  $120 payroll  ·  $%d cash" % [details.day, details.stays, details.cash], 12.0)
 		&"construction_applied":
@@ -476,6 +530,9 @@ func _open_dialog(mode: String) -> void:
 	_remove_dialog()
 	menu_mode = mode
 	camera.cancel_drag()
+	if design.draft:
+		design.close_building_settings()
+		_refresh_design_ui()
 	ui.set_interactive(false)
 	overlay.show()
 	match mode:
@@ -521,11 +578,11 @@ func _build_welcome() -> void:
 	_make_dialog(624, 435)
 	_label(dialog, Rect2(30, 34, 564, 55), "All Inclusive", 43, INK, HORIZONTAL_ALIGNMENT_LEFT, display_font)
 	_label(dialog, Rect2(31, 100, 558, 25), "Welcome families for three days at your tropical resort.", 18, INK)
-	_label(dialog, Rect2(31, 132, 560, 46), "Families check in at reception, settle into a bedroom,\neat at the buffet, then head to the pool.", 16, MUTED)
+	_label(dialog, Rect2(31, 132, 560, 46), "Families check in, settle into a bedroom, collect food,\neat at a restaurant table, then head to the pool.", 16, MUTED)
 	var objectives := _panel(dialog, Rect2(29, 189, 566, 63), CARD, LINE, 4)
 	_label(objectives, Rect2(13, 4, 535, 23), "YOUR DAY 3 TARGETS", 12, WINE)
 	_label(objectives, Rect2(13, 28, 535, 23), "8 completed stays    ·    75 average rating    ·    Pool terrace", 16, INK)
-	_label(dialog, Rect2(31, 261, 560, 62), "Use Booking before 00:20 and Staff to shorten queues.\nUse Build to draw buildings and furnish the pool deck.\nDrag the map to explore, scroll to zoom, and press Home to reset.", 15, INK)
+	_label(dialog, Rect2(31, 261, 560, 62), "Use Booking before 00:20 and Staff to shorten queues.\nUse Build to draw buildings, furnish rooms and edit the landscape.\nDrag the map to explore, scroll to zoom, and press Home to reset.", 15, INK)
 
 	var start := _button(dialog, Rect2(29, 344, 182, 42), "Regular resort", _new_run.bind("regular"), 16, true)
 	_button(dialog, Rect2(221, 344, 214, 42), "Developer · Free build", _new_run.bind("developer"), 15)
@@ -565,7 +622,7 @@ func _add_load_button(rect: Rect2, font_size: int = 15) -> void:
 func _build_new_run() -> void:
 	_make_dialog(540, 204)
 	_label(dialog, Rect2(29, 29, 480, 45), "Start a fresh run", 32, INK, HORIZONTAL_ALIGNMENT_LEFT, display_font)
-	_label(dialog, Rect2(29, 78, 480, 23), "Regular mode charges for construction and furnishings.", 16, MUTED)
+	_label(dialog, Rect2(29, 78, 480, 23), "Regular mode charges for buildings, furnishings and landscaping.", 16, MUTED)
 	var start := _button(dialog, Rect2(29, 117, 154, 42), "Regular resort", _new_run.bind("regular"), 15, true)
 	_button(dialog, Rect2(193, 117, 194, 42), "Developer · Free build", _new_run.bind("developer"), 15)
 	_button(dialog, Rect2(397, 117, 114, 42), "Back", _open_dialog.bind("recap"), 15)
@@ -583,6 +640,7 @@ func _new_run(mode: String = "regular") -> void:
 	saved_draft = null
 	started = true
 	paused = false
+	exterior_view = false
 	speed = 1
 	elapsed = 0.0
 	last_notice = ""
@@ -614,25 +672,32 @@ func _write_run(draft: Layout) -> bool:
 	return SaveSlot.write({
 		"version": SAVE_VERSION, "simulation": simulation.snapshot(),
 		"draft": draft.snapshot() if draft else {}, "elapsed": elapsed,
-		"speed": speed, "camera": camera.snapshot(),
+		"speed": speed, "camera": camera.snapshot(), "exterior_view": exterior_view,
 	})
 
 
 func _load_run() -> void:
 	var data: Dictionary = SaveSlot.read()
+	var version: Variant = data.get("version")
+	var has_landscape: bool = version in [LANDSCAPE_SAVE_VERSION, EXTERIOR_SAVE_VERSION, SAVE_VERSION]
+	if has_landscape and _save_changes_protected_coast(data):
+		_show_save_error("This save changes the protected coast. Your file and run are intact.")
+		return
 	var loaded := Sim.new()
 	var valid: bool = (
-		data.get("version") in [1, 2, SAVE_VERSION] and data.get("simulation") is Dictionary
+		(version in [1, 2, 3] or has_landscape) and data.get("simulation") is Dictionary
 		and data.get("speed") is int and data.speed in SPEEDS and data.get("elapsed") is float
 		and is_finite(data.elapsed) and data.elapsed >= 0.0 and data.elapsed < 1.0
-		and loaded.restore(data.simulation, data.version < SAVE_VERSION)
+		and loaded.restore(data.simulation, version < 3, has_landscape, version == SAVE_VERSION)
 	)
 	var draft: Layout
-	if valid and data.version == SAVE_VERSION:
+	if valid and data.version >= 3:
 		valid = data.get("draft") is Dictionary
 		if valid and not data.draft.is_empty():
 			draft = Layout.new()
-			valid = draft.restore(data.draft)
+			valid = (not has_landscape or data.draft.get("landscape") is Dictionary) and draft.restore(data.draft)
+			if valid and not data.draft.has("landscape"):
+				Sim.prune_migrated_scenery(draft, loaded.layout)
 	if not valid:
 		_show_save_error("The save is missing or unreadable. Your current run is safe.")
 		return
@@ -642,6 +707,7 @@ func _load_run() -> void:
 	elapsed = data.elapsed
 	started = true
 	paused = true
+	exterior_view = version in [EXTERIOR_SAVE_VERSION, SAVE_VERSION] and data.get("exterior_view") == true
 	ui.close_panel()
 	camera.home()
 	if data.get("camera") is Dictionary:
@@ -653,6 +719,18 @@ func _load_run() -> void:
 		_close_dialog()
 		_toast("Run loaded. Open Build to resume your draft." if saved_draft else "Saved run loaded  ·  Clock paused")
 	_start_music()
+
+
+func _save_changes_protected_coast(data: Dictionary) -> bool:
+	var saved_sim: Variant = data.get("simulation")
+	if not saved_sim is Dictionary:
+		return false
+	for layout in [saved_sim.get("layout"), saved_sim.get("pending_layout"), data.get("draft")]:
+		if layout is Dictionary:
+			var landscape: Variant = layout.get("landscape")
+			if landscape is Dictionary and Layout.Landscape.has_protected_water_edits(landscape):
+				return true
+	return false
 
 
 func _show_save_error(words: String) -> void:
@@ -729,21 +807,37 @@ func _apply_mute() -> void:
 
 func _smoke_test() -> void:
 	_new_run()
+	if not _smoke_landscape():
+		push_error("All Inclusive smoke test could not load the editable landscape defaults.")
+		get_tree().quit(1)
+		return
 	var draft: Layout = simulation.layout.duplicate_layout()
 	var pool: Dictionary = draft.buildings.back()
 	draft.add_asset("lounger", pool.id, Vector2i(1, 2))
 	draft.add_asset("lounger", pool.id, Vector2i(16, 2))
 	draft.add_asset("umbrella", pool.id, Vector2i(2, 7))
+	var collected := false
+	var waited_for_table := false
+	var ate_at_table := false
+	var left_table := false
 	for i in range(3 * Sim.DAY_LENGTH):
 		simulation.tick()
+		collected = collected or simulation.count_at(1, "service") > 0
+		waited_for_table = waited_for_table or simulation.count_at(1, "wait_table") > 0
+		ate_at_table = ate_at_table or simulation.count_at(1, "eating") > 0
+		left_table = left_table or simulation.count_at(1, "to_pool") > 0
 		if simulation.day == 2 and simulation.second == 0:
 			simulation.apply_construction(draft)
 	_refresh()
+	if not (collected and waited_for_table and ate_at_table and left_table):
+		push_error("All Inclusive smoke test did not exercise the full restaurant meal.")
+		get_tree().quit(1)
+		return
 	if simulation.cash != 1120 or simulation.reviews.size() != 12 or not simulation.terrace or not simulation.stopped:
 		push_error("All Inclusive smoke test failed: %s" % simulation.snapshot())
 		get_tree().quit(1)
 		return
-	if not is_equal_approx(simulation.average(), 95.25):
+	if not is_equal_approx(simulation.average(), 93.25):
 		push_error("All Inclusive smoke test rating mismatch: %f" % simulation.average())
 		get_tree().quit(1)
 		return
@@ -757,5 +851,24 @@ func _smoke_test() -> void:
 		get_tree().quit(1)
 		return
 	_open_dialog("recap")
-	print("ALL INCLUSIVE SMOKE PASS — 12 stays, 95.25 rating, $1120, furnished terrace, modular map, ocean and audio loaded")
+	print("ALL INCLUSIVE SMOKE PASS — 12 stays, 93.25 rating, $1120, restaurant meals, furnished terrace, editable landscape, ocean and audio loaded")
 	get_tree().quit()
+
+
+func _smoke_landscape() -> bool:
+	var landscape := simulation.layout.landscape
+	var counts := {}
+	for prop in landscape.props:
+		counts[prop.kind] = counts.get(prop.kind, 0) + 1
+	var region := Layout.Landscape.REGION
+	var path_counts := {}
+	for y in range(region.position.y, region.end.y):
+		for x in range(region.position.x, region.end.x):
+			var path := landscape.path_at(Vector2i(x, y))
+			if not path.is_empty():
+				path_counts[path] = path_counts.get(path, 0) + 1
+	return (
+		map.landscape_renderer != null and counts == {"palm": 38, "bush": 24, "rock": 4, "beach_flag": 1}
+		and path_counts == {"stone": 158, "boardwalk": 56} and landscape.terrain_at(Vector2i(95, 14)) == "water"
+		and landscape.terrain_at(Vector2i(44, 14)) == "dirt"
+	)

@@ -7,6 +7,10 @@ Original pixel artwork and character animation for this project.
 Source generator: assets/art/generate_art.mjs
 Original pixel UI icons: scripts/resort_ui.gd
 Original modular buildings and furnishings: scripts/building_renderer.gd
+Original exterior facades and signs: scripts/building_renderer.gd
+Original floor/wall/ceiling pixel textures: assets/art/building_finishes.gd
+Original guest plate, chair and seated-eating artwork: scripts/resort_map.gd
+Original editable terrain and scenery, plus ocean animation: scripts/landscape_renderer.gd and scripts/ocean.gd
 Original construction menu icons: scripts/design_ui.gd
 
 MUSIC AND SOUND

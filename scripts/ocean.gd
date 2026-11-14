@@ -3,25 +3,56 @@ extends Node2D
 enum Condition { CALM, CAUTION, CLOSED }
 
 const SHORE_PROFILE := preload("res://assets/art/resort_shore.png")
+const Landscape = preload("res://scripts/landscape_model.gd")
+const LandscapeRenderer = preload("res://scripts/landscape_renderer.gd")
 const MAP_LEFT := -160
 const MAP_TOP := -120
 const MAP_RIGHT := 800
 const SURF_PERIOD := 112.0
-const FLAG_BASE := Vector2(477, 158)
 const CONDITION_NAMES := ["Calm", "Caution", "Closed"]
 const CONDITION_COLORS := [Color("#78c897"), Color("#ffce70"), Color("#f66b65")]
 
 var _time := 0.0
 var _shore := PackedInt32Array()
+var _landscape: Landscape
+var _landscape_revision := -1
+var _disturbed_rows := PackedByteArray()
+var _painted_water: Array[Vector2i] = []
+var _flags: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var profile := SHORE_PROFILE.get_image()
 	_shore.resize(profile.get_height())
+	_disturbed_rows.resize(profile.get_height())
 	for row in range(_shore.size()):
 		var encoded := profile.get_pixel(0, row)
 		_shore[row] = MAP_LEFT + encoded.r8 + (encoded.g8 << 8)
+
+
+func set_landscape(landscape: Landscape) -> void:
+	if _landscape == landscape and _landscape_revision == landscape.revision:
+		return
+	_landscape = landscape
+	_landscape_revision = landscape.revision
+	if _disturbed_rows.is_empty():
+		_disturbed_rows.resize(int(Landscape.WORLD_BOUNDS.size.y))
+	_disturbed_rows.fill(0)
+	_painted_water.clear()
+	for cell: Vector2i in landscape.terrain_overrides:
+		if not landscape.ground_signature(cell).begins_with("paint:"):
+			continue
+		var first_row := cell.y * Landscape.GRID - MAP_TOP
+		for row in range(first_row, first_row + Landscape.GRID):
+			_disturbed_rows[row] = 1
+		if landscape.terrain_overrides[cell] == "water":
+			_painted_water.append(cell)
+	_flags.clear()
+	for prop in landscape.props:
+		if prop.kind == "beach_flag":
+			_flags.append(prop.duplicate(true))
+	queue_redraw()
 
 
 func present(total_sim_time: float) -> void:
@@ -59,7 +90,8 @@ func _draw() -> void:
 	_draw_open_water(energy)
 	_draw_breakers(energy)
 	_draw_wash(energy)
-	_draw_flag()
+	_draw_painted_water()
+	_draw_flags()
 
 
 func _draw_open_water(energy: float) -> void:
@@ -110,39 +142,44 @@ func _draw_wash(energy: float) -> void:
 		_draw_water_run(_shore[row], MAP_TOP + row, length, color)
 
 
-# Every animated run starts at the first water pixel or farther offshore.
 func _draw_water_run(x: int, y: int, width: int, color: Color) -> void:
 	var row := y - MAP_TOP
 	if row < 0 or row >= _shore.size():
 		return
-	var start := maxi(x, _shore[row])
+	var start := maxi(x, MAP_LEFT)
 	var end := mini(MAP_RIGHT, x + width)
-	if end > start:
-		draw_rect(Rect2(start, y, end - start, 1), color)
+	if _disturbed_rows[row] == 0:
+		start = maxi(start, _shore[row])
+		if end > start:
+			draw_rect(Rect2(start, y, end - start, 1), color)
+		return
+	var run_start := end
+	for pixel in range(start, end):
+		if _landscape.is_water_pixel(Vector2(pixel, y)):
+			run_start = mini(run_start, pixel)
+		elif run_start < pixel:
+			draw_rect(Rect2(run_start, y, pixel - run_start, 1), color)
+			run_start = end
+	if run_start < end:
+		draw_rect(Rect2(run_start, y, end - run_start, 1), color)
 
 
-func _draw_flag() -> void:
+func _draw_painted_water() -> void:
+	for cell in _painted_water:
+		var phase := sin(_time * 2.1 + cell.x * 6.2 + cell.y * 4.7)
+		if phase < 0.22:
+			continue
+		var pixel := cell * Landscape.GRID + Vector2i(2, 2 + posmod(cell.x + cell.y, 4))
+		var glint := Color(0.74, 0.94, 0.87, 0.25 * phase)
+		var width := 2 + posmod(cell.x * 3 + cell.y, 4)
+		draw_rect(Rect2(pixel.x, pixel.y, width, 1), glint)
+
+
+func _draw_flags() -> void:
 	var color := condition_color()
 	var wind := 0.9 + _wave_energy(_time) * 2.4
 	var fold := roundf(sin(_time * 4.8) * wind)
 	var tip := roundf(sin(_time * 4.8 - 0.95) * wind)
-	draw_rect(Rect2(FLAG_BASE + Vector2(-3, -2), Vector2(19, 3)), Color("#d6ad83"))
-	draw_rect(Rect2(FLAG_BASE + Vector2(-1, -43), Vector2(3, 43)), Color("#966952"))
-	draw_rect(Rect2(FLAG_BASE + Vector2(-1, -43), Vector2(1, 43)), Color("#f8d5a1"))
-	draw_rect(Rect2(FLAG_BASE + Vector2(-2, -45), Vector2(5, 3)), Color("#fbe8b7"))
-	var flag := PackedVector2Array([
-		FLAG_BASE + Vector2(2, -40),
-		FLAG_BASE + Vector2(12, -40 + fold),
-		FLAG_BASE + Vector2(23, -38 + tip),
-		FLAG_BASE + Vector2(17, -32 + tip),
-		FLAG_BASE + Vector2(23, -27 + tip),
-		FLAG_BASE + Vector2(12, -28 + fold),
-		FLAG_BASE + Vector2(2, -28),
-	])
-	draw_colored_polygon(flag, color)
-	draw_polyline(flag, Color("#715651"), 1.0)
-	draw_rect(Rect2(455, 136, 49, 21), Color("#b58b68"))
-	draw_rect(Rect2(454, 135, 49, 21), Color("#443b40"))
-	draw_rect(Rect2(454, 135, 49, 1), Color("#fff0c5"))
-	draw_string(ThemeDB.fallback_font, Vector2(455, 143), "OCEAN", HORIZONTAL_ALIGNMENT_CENTER, 47, 7, Color("#fff0c5"))
-	draw_string(ThemeDB.fallback_font, Vector2(455, 153), condition_name(), HORIZONTAL_ALIGNMENT_CENTER, 47, 9, color)
+	for prop in _flags:
+		var anchor := LandscapeRenderer.prop_anchor(prop)
+		LandscapeRenderer.draw_beach_flag(self, anchor, prop.rotation, color, fold, tip)

@@ -20,6 +20,12 @@ Use waves: planner plus visual designer first; replace planner with the sole sof
 
 For interface/world revisions, start the UI designer and visual/world designer together with separate new component files; replace the finished UI designer with the sole integration developer. Root may own an isolated camera component and its tests. Respect session-specific user restrictions: during revision 2 the user requested no further computer use and a break for the tester, so developer/root headless verification continues while independent native playtesting is deferred.
 
+For revision 4, the two specialist slots are a combined UI/core integrator and a landscape visual designer. Root owns landscape data, navigation and model tests, while the PM coordinates contracts and acceptance. The existing no-computer-use and tester-break instructions continue. Local development/export is authorized; publishing a GitHub release or pushing these changes is outside this request.
+
+For revision 5, use the same model roster with a building visual designer (renderer, textures and signs) and a UI/core integrator (properties, view mode, saves and export). Root owns building metadata, finish pricing and model tests. Keep the fixed coast and the no-computer-use/tester-break restrictions. The PM accepts against headless evidence and records native visual QA as deferred.
+
+For revision 6, the two specialist slots are the simulation/layout/core developer and dining map/visual specialist. Root owns a separate independent dining-contract test plus launch documentation and packaging. Keep the Astra/high PM and Sol/xhigh specialists, fixed coast, no computer use and tester break. New activity states must use real editable geometry and serializable reservations, with visual poses derived from the same state.
+
 ## Planner
 
 Define the smallest coherent loop that satisfies the brief. Provide numeric defaults, pacing, state changes, controls and acceptance criteria. Highlight assumptions. Hand off a concrete contract rapidly; avoid expanding scope.

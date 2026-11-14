@@ -67,22 +67,21 @@ func _test_staffing() -> void:
 	pool_float.float_station = 2
 	_tick(pool_float, 180)
 	var pool_waits: Array = pool_float.families.map(func(family: Dictionary) -> int: return family.waits[2])
-	_check(pool_waits == [0, 0, 0, 0] and pool_float.families[3].waits[1] == 30,
-		"Pool staffing eliminates pool waits and moves the peak 30-second wait to buffet")
+	_check(pool_waits == [0, 0, 0, 0] and pool_float.families[3].waits[1] == 0 and pool_float.families[3].dining_wait == 24,
+		"Pool staffing eliminates pool waits while the fourth family still waits 24 seconds for a table")
 
 	var transfer := Sim.new()
 	_tick(transfer, 55)
-	var before: Array = transfer.families.slice(0, 2).duplicate(true)
-	_check(transfer.count_at(1, "service") == 2, "Buffet float opens a second simultaneous service slot")
+	var deadline: int = transfer.families[1].until
+	_check(transfer.capacity(1) == 2 and transfer.count_at(1, "service") == 1, "Buffet float opens a second counter slot")
 	transfer.float_station = 2
-	_tick(transfer, 7)
-	_check(transfer.count_at(1, "service") == 2 and transfer.count_at(1, "queue") == 1
-		and transfer.families[0].until == before[0].until and transfer.families[1].until == before[1].until,
-		"Mid-service transfer preserves both finish times and queues new arrivals")
-	_tick(transfer, 10)
-	_check(transfer.families[2].phase == "service" and transfer.families[2].since == 72
-		and transfer.families[3].phase == "queue", "Remaining capacity takes next family in arrival order at release")
-	_tick(transfer, 167)
+	_tick(transfer, 1)
+	_check(transfer.capacity(1) == 1 and transfer.families[1].phase == "service" and transfer.families[1].until == deadline,
+		"Mid-service transfer preserves food-collection deadlines")
+	_tick(transfer, 6)
+	_check(transfer.families[2].phase == "service" and transfer.families[2].since == 62
+		and transfer.families[1].phase == "wait_table", "Table waiting releases the counter to the next family")
+	_tick(transfer, 177)
 	_check(_closed(transfer), "Rooms and guest phases clear before closing after staff transfer")
 
 	var rng := RandomNumberGenerator.new()
@@ -112,11 +111,11 @@ func _test_recap() -> void:
 	_tick(sim, 158)
 	_check(sim.cash == 620 and sim.rooms == [0, 1, 2, 3] and not sim.terrace,
 		"Standard Day 1 posts four room charges and keeps the original pool")
-	_check(sim.families[3].waits[2] == 34 and sim.families[3].phase == "rest", "Standard buffet staffing yields a 34-second peak pool wait")
+	_check(sim.families[3].waits[2] == 12 and sim.families[3].dining_wait == 24 and sim.families[3].phase == "rest", "Standard with one table yields a 12-second peak pool wait and a 24-second peak dining wait")
 	_tick(sim, 81)
-	_check(_closed(sim) and _scores(sim) == [92, 89, 84, 78], "Day 1 closes with four exact checkout ratings and all rooms released")
-	_check(sim.reviews.slice(1).all(func(review: Dictionary) -> bool: return review.note == "Long pool line"),
-		"Day 1 penalized reviews identify the pool line")
+	_check(_closed(sim) and _scores(sim) == [92, 91, 86, 80], "Day 1 closes with four exact checkout ratings and all rooms released")
+	_check(sim.reviews.slice(1).all(func(review: Dictionary) -> bool: return review.note == "Long dining table wait"),
+		"Day 1 penalized reviews identify table waits")
 	_tick(sim, 1)
 	_check(sim.cash == 500 and sim.apply_construction(_terrace_plan(sim)).ok and sim.cash == 400 and sim.terrace,
 		"One $120 payroll, followed by $100 of terrace furnishings")
@@ -124,9 +123,9 @@ func _test_recap() -> void:
 	_check(sim.capacity(2) == 3, "Terrace capacity stacks with a floating worker")
 	sim.float_station = 1
 	_tick(sim, 480)
-	_check(sim.stopped and sim.milestone == {"stays": 12, "average": 95.25, "terrace": true, "cash": 1120}
-		and _scores(sim).slice(4) == [100, 100, 100, 100, 100, 100, 100, 100],
-		"Standard full success gives 12 stays, 95.25 rating, $1120 and all upgraded reviews at 100")
+	_check(sim.stopped and sim.milestone == {"stays": 12, "average": 93.25, "terrace": true, "cash": 1120}
+		and _scores(sim).slice(4) == [100, 99, 95, 91, 100, 99, 95, 91],
+		"Standard full success gives 12 stays, 93.25 rating and $1120, with remaining dining wait penalties")
 	var milestone := sim.milestone.duplicate()
 	var before := sim.snapshot()
 	_tick(sim, 40)
@@ -220,8 +219,8 @@ func _test_scene() -> void:
 	_check(not game.settings_open and game.ui._panel_id == "package", "Switching from Settings clears its clock pause")
 	game.ui._body.options[2].pressed.emit()
 	game.ui._speed_buttons[1].pressed.emit()
-	_check(game.simulation.count_at(2, "queue") == 2 and game.simulation.count_at(2, "service") == 1,
-		"Checkpoint contains queued guests and active pool service")
+	_check(game.simulation.count_at(1, "wait_table") == 1 and game.simulation.count_at(2, "service") == 1,
+		"Checkpoint contains dining-table wait and active pool service")
 	_check("Day 2" in game.ui._body.effective.text and "3 families" in game.ui._body.effective.text
 		and "Higher expectations" in game.ui._body.details.text and "Standard $120" in game.ui._body.booking.text,
 		"Booking panel distinguishes the current booking lock from next-day Premium demand")
@@ -403,8 +402,11 @@ func _test_v1_slot() -> void:
 		and game.simulation.float_station == 1 and not -1 in game.simulation.rooms,
 		"Original release save restores Day 1 00:58, $620, Standard, buffet staffing and four occupied rooms")
 	var loaded: Dictionary = game.simulation.snapshot()
-	for key in ["mode", "layout", "pending_layout", "pending_reserve", "booked_count"]:
+	for key in ["mode", "layout", "pending_layout", "pending_reserve", "booked_count", "meal_version"]:
 		loaded.erase(key)
+	for family in loaded.families:
+		for key in ["table_id", "dining_wait", "legacy_meal"]:
+			family.erase(key)
 	_check(loaded == saved.get("simulation") and game.simulation.mode == "regular"
 		and game.simulation.layout.readiness().ok and game.camera.snapshot() == home
 		and game.map.ocean.condition_name() == "Closed"

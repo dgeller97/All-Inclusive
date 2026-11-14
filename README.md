@@ -1,12 +1,14 @@
 # All Inclusive
 
-A compact resort-management game. Welcome families, set package prices, balance staff, and design the resort with buildings and furnishings.
+A compact resort-management game. Welcome families, set package prices, balance staff, and design the resort with buildings, furnishings, paths, terrain, and scenery.
 
 ![Expanded resort terrain artwork](assets/art/resort.png)
 
 ## Play on Windows
 
 [Download the latest Windows build](https://github.com/dgeller97/All-Inclusive/releases/latest/download/AllInclusive-Windows.zip), extract the ZIP, and double-click `AllInclusive.exe`. No Godot installation is required. [Release notes and checksums](https://github.com/dgeller97/All-Inclusive/releases/latest) are available on GitHub. Use the Windows ZIP asset, not GitHub's automatically generated source-code archives.
+
+The current local development build is Revision 6, with interactive restaurant visits, exterior views, building names, customizable finishes and landscape editing. The published GitHub release remains v0.3.0 until a new release is uploaded.
 
 Extract `build/AllInclusive-Windows.zip` and open `AllInclusive.exe`. From the project folder, you can also open `build/windows/AllInclusive.exe` directly. The game runs on 64-bit Windows and includes its assets.
 
@@ -25,11 +27,49 @@ Windows stores the save and audio preference under `%APPDATA%\Godot\app_userdata
 
 ## Design your resort
 
+### Restaurant visits
+
+Families now collect food at the buffet counter, carry their plates to an available table, sit and eat, then leave for the pool. Each table serves one family at a time and is reserved while they walk over and eat. Guests use the actual tables placed in your restaurant, including tables you add or rebuild elsewhere.
+
+Assigning the floating worker to the buffet adds a food-collection slot; adding accessible dining tables reduces seating waits. With the current arrival spacing, tables are the main restaurant bottleneck and the extra buffet slot is rarely needed. Regular dining tables cost $20 each. Leave walking space beside them for diners. Long waits for a table can lower reviews separately from the buffet queue. Meal progress and table reservations save with the run.
+
+Switch to **Show interiors** to watch guests collecting, carrying and eating their food. Exterior view hides diners inside enclosed buildings.
+
+### Construction
+
 Start a **Regular resort** to pay construction costs, or choose **Developer · Free build** to experiment without spending money. The mode is saved with the run. A regular pool improvement costs $100 in furnishings (two $30 loungers and a $40 umbrella); starter hotel assets have no demolition refund. Newly purchased assets refund half their paid cost when removed.
 
-Build mode pauses the clock and edits a draft. Choose a building and drag a rectangle on the land; choose a furnishing and click inside its matching building. Press R to rotate furnishings. Use Select to inspect objects and Bulldoze to remove them. Bulldoze prioritizes furniture; click empty floor to remove a whole building and its contents. Moving an existing object currently requires bulldozing and rebuilding it. Middle-button drag and the mouse wheel still pan and zoom. Right click or Esc cancels the current tool.
+Build mode pauses the clock and edits a draft. Choose a building and drag a rectangle on the land; choose a furnishing and click inside its matching building. Press R to rotate furnishings. Use Select to inspect objects and Bulldoze to remove them. Bulldoze prioritizes furniture; click empty floor to remove a whole building and its contents. Moving buildings or indoor furniture currently requires bulldozing and rebuilding them. Middle-button drag and the mouse wheel still pan and zoom. Right click or Esc cancels the current tool.
 
 Rooms need accessible beds, reception needs a desk, and the buffet needs a counter and dining table. Keep doorways open and buildings clear of the ocean. Apply an operational layout immediately when no families are staying, or queue it for tomorrow while guests finish their holiday. Save draft preserves unfinished work. Discard returns to the hotel and drops edits made since the last draft save; a saved draft remains available from Build. Queued construction reserves its cost, and canceling the queued plan returns the reserved amount.
+
+### Building appearance
+
+Use **Show exterior / Show interiors** to switch the whole resort between cutaway interiors and complete buildings with roofs, front walls and signs. The pool stays outdoors. Entering Build temporarily shows interiors for editing; leaving it restores your chosen view. Your view preference saves with the run.
+
+In Build, use **Select**, click an empty part of a building's floor, then open **Building settings**. Enter a name of up to 24 characters and press **Set name** or Enter; names appear on physical building signs. Lobby and Restaurant are the default service-building names. Pools can also be named.
+
+Enclosed buildings have separate **Floor**, **Wall**, and **Ceiling** choices:
+
+- Floor: Original, Tile, Wood, or Stone — $12 per changed floor.
+- Wall: Original, Plaster, Brick, or Timber — $10 per changed wall.
+- Ceiling: Original, Plaster, Beams, or Panels — $8 per changed ceiling.
+
+**Inspect ceiling** previews the selected building's ceiling separately from its exterior roof. Renaming is free. Regular mode charges only the final finish differences in the draft, and Developer mode is free. Finish changes have no demolition refund. Names and finishes use the same Apply now/tomorrow and Save draft controls as construction; older compatible saves receive the original finishes automatically.
+
+### Landscape tools
+
+Open **Build → Landscape**, then choose **Terrain**, **Paths**, or **Scenery**.
+
+- **Terrain:** paint grass, sand, or dirt on dry land with 1 × 1, 3 × 3, or 5 × 5 tile brushes. Left-drag and release to commit a stroke. The coastline and ocean remain fixed, including partly wet shoreline tiles. **Restore** returns the original ground and path surface on dry land.
+- **Paths:** draw stone paths or boardwalks. **Erase path** reveals the underlying ground. Guests prefer connected paths, while unpaved dry land remains walkable. Diagonal strokes fill connecting cells so thin paths remain usable.
+- **Scenery:** place palms, shrubs, rocks, outdoor benches, and the beach flag. All starter scenery is editable. Select an object and use **Move** to relocate it, R to rotate it, or **Bulldoze** to remove it. Moving scenery preserves its identity and purchase value.
+
+Ground beneath buildings cannot be painted until the building is removed. Terrain, path, and Restore strokes that cross protected shoreline or ocean cells are rejected as a whole. Apply still requires a usable hotel and connected guest routes. Ocean animation follows the original shoreline; water painting, land reclamation, bridges, and ocean swimming are deferred.
+
+Regular mode charges per changed tile: grass/sand/dirt $1, stone path $2, and boardwalk $3. Surface removal has no resale refund; returning a draft to its active state cancels its quoted expense. Outdoor scenery costs $3–$15, moving it is free, and demolition refunds half its actual paid cost. Developer mode remains free. Terrain, paths, scenery, incomplete drafts, and queued plans all save with the run.
+
+Earlier compatible saves continue to load. A save containing genuine water or shoreline edits from the superseded experimental build is rejected with a specific message; the saved file and current run remain unchanged. The same protection applies to queued plans and saved drafts.
 
 ## Run from source
 
@@ -46,7 +86,11 @@ $godot = ".\.tools\godot\Godot_v4.7.2-stable_win64_console.exe"
 & $godot --headless --path . --script res://tests/camera_test.gd
 & $godot --headless --path . --script res://tests/ui_layout_test.gd
 & $godot --headless --path . --script res://tests/layout_model_test.gd
+& $godot --headless --path . --script res://tests/building_identity_test.gd
+& $godot --headless --path . --script res://tests/building_renderer_test.gd
+& $godot --headless --path . --script res://tests/dining_contract_test.gd
 & $godot --headless --path . --script res://tests/construction_transactions_test.gd
+& $godot --headless --path . --script res://tests/landscape_model_test.gd
 & $godot --headless --path . -- --smoke-test
 & ".\.tools\godot\Godot_v4.7.2-stable_win64.exe" --path .
 ```
@@ -63,4 +107,4 @@ The design and production notes are in `docs/`.
 
 The starter resort has four bedrooms and three service areas. You can build up to eight bedrooms and one reception, buffet, and pool. Bookings remain capped at four families per day (three on Premium), limited by the number of usable bedrooms. Families follow a repeating daily schedule and swim in the resort pool. Pricing and staffing affect revenue and reviews. Plants and benches are decorative; multiple floors, multiple copies of service buildings, and a larger progression system are deferred.
 
-See `docs/revision-3.md` for the construction design and scope. Current validation uses headless checks; interactive desktop playtesting is paused at the user's request. The native Windows playthrough in `docs/native-playtest.md` covers the original first playable release only.
+See `docs/revision-6.md` for restaurant interactions, `docs/revision-5.md` for building appearance, `docs/revision-4.md` for landscape editing and `docs/revision-3.md` for the underlying construction system. Current validation uses headless checks; interactive desktop playtesting is paused at the user's request. The native Windows playthrough in `docs/native-playtest.md` covers the original first playable release only.

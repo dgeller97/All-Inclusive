@@ -48,6 +48,12 @@ func _test_developer() -> void:
 	_check(game.design_ui.visible and not game.ui.visible and not game.map.actors.visible, "Design overlays replace management HUD and hide live actors")
 	game._process(4.0)
 	_check(initial.second == 0, "Opening Build pauses the simulation")
+	var construction_site := Rect2(304, 56, 48, 48)
+	for prop in draft.landscape.props.duplicate():
+		if construction_site.intersects(draft.prop_rect(prop)):
+			_category("landscape")
+			_tool("bulldoze")
+			_click_world(draft.prop_rect(prop).get_center())
 	_tool("bedroom")
 	_drag_world(Vector2(308, 60), Vector2(348, 100))
 	var extra := draft.building_at(Vector2(310, 60))
@@ -117,12 +123,13 @@ func _test_developer() -> void:
 	var pose: Dictionary = game.map._pose(family)
 	_check(initial.booked_count == 1 and family.phase == "to_room" and not expected.is_empty()
 		and _on_route(pose.point, expected) and _on_route(pose.child, expected), "Demand caps at one usable room and family sprites follow its walkable route")
-	_tick(36)
+	_tick(40)
 	var pool_deck := initial.layout.station_point(2)
-	var to_pool := initial.layout.route(initial.layout.station_point(1), pool_deck)
+	var table: Dictionary = initial.layout.dining_tables()[0]
+	var to_pool := initial.layout.route(table.seat, pool_deck)
 	pose = game.map._pose(family)
 	_check(family.phase == "to_pool" and pool_deck != old_deck and to_pool[-1] == pool_deck
-		and _on_route(pose.point, to_pool), "Guests approach the relocated pool on its walkable deck route")
+		and family.table_id == table.id and _on_route(pose.point, to_pool), "Guests approach the relocated pool on the walkable route from their table")
 	_tick(6)
 	pose = game.map._pose(family)
 	var water := initial.layout.water_rect(new_pool)
@@ -148,7 +155,7 @@ func _test_regular() -> void:
 	_click_world(desk)
 	_check(game.design_ui._apply.disabled and "desk" in game.design_ui._apply_reason.text, "Incomplete operational draft disables Apply with a reason")
 	_context("Save draft")
-	_check(SaveSlot.read().get("version") == 3 and game.saved_draft != null, "Save draft writes an incomplete design with the live run")
+	_check(SaveSlot.read().get("version") == game.SAVE_VERSION and game.saved_draft != null, "Save draft writes an incomplete design with the live run")
 	_context("Discard")
 	_check(game.design.draft == null and not game.simulation.layout.asset_at(desk).is_empty(), "Discard exits and preserves live layout")
 	game.queue_free()
@@ -230,7 +237,16 @@ func _open_build() -> void:
 
 
 func _tool(id: String) -> void:
+	if Layout.BUILDING_CATALOG.has(id):
+		_category("buildings")
+	elif Layout.ASSET_CATALOG.has(id):
+		_category("furniture")
 	_click(game.design_ui._tool_buttons[id].get_global_rect().get_center())
+
+
+func _category(id: String) -> void:
+	if game.design.category != id:
+		_click(game.design_ui._category_buttons[id].get_global_rect().get_center())
 
 
 func _context(text: String) -> void:

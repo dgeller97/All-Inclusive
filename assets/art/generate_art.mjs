@@ -136,6 +136,9 @@ const leaf = '#679f5b';
 const newLeaf = '#8fb867';
 
 const world = {left: -160, top: -120, width: 960, height: 600};
+const grid = 8;
+const gridWidth = world.width / grid;
+const gridHeight = world.height / grid;
 const shorelineAnchors = [
   [-120, 386], [-98, 403], [-70, 425], [-36, 451], [0, 471], [43, 490],
   [80, 508], [114, 513], [146, 510], [180, 502], [215, 497], [248, 484],
@@ -160,18 +163,6 @@ function shorelineX(y) {
 }
 
 const coast = Array.from({length: world.height}, (_, row) => shorelineX(world.top + row));
-
-function walk(canvas, x, y, w, h) {
-  canvas.rect(x + 1, y + 2, w, h, '#c69a73');
-  canvas.rect(x, y, w, h, '#f5d9aa');
-  for (let row = 2; row < h; row += 6) {
-    canvas.rect(x + 1, y + row, w - 2, 1, '#e8c99a');
-    for (let col = 4 + (row % 4) * 2; col < w - 2; col += 15) {
-      canvas.rect(x + col, y + row, 1, Math.min(6, h - row), '#eacb9c');
-    }
-  }
-  canvas.rect(x, y, w, 1, '#ffe7b7');
-}
 
 function ground(canvas) {
   for (const [row, shore] of coast.entries()) {
@@ -201,12 +192,10 @@ function ground(canvas) {
   canvas.polygon([[84, 253], [141, 254], [170, 271], [163, 287], [178, 323], [220, 346], [288, 352], [337, 371], [348, 396], [315, 420], [304, 451], [274, 479], [50, 479], [62, 421], [95, 372], [87, 341], [97, 311], [82, 287]], '#b6b777');
   canvas.polygon([[151, 314], [177, 322], [204, 347], [258, 364], [291, 395], [274, 425], [248, 439], [224, 479], [83, 479], [91, 445], [127, 400], [117, 355]], '#a6ae6d');
   canvas.polygon([[178, 269], [213, 255], [316, 252], [347, 274], [373, 277], [394, 293], [405, 310], [381, 321], [349, 311], [307, 314], [284, 298], [248, 299], [219, 284], [194, 287]], '#d1bb79');
+  const materials = defaultMaterials(canvas);
   terrainTexture(canvas);
-  walk(canvas, 40, 240, 389, 12);
-  walk(canvas, 49, 251, 17, 71);
-  canvas.polygon([[48, 318], [66, 318], [67, 352], [59, 374], [40, 395], [27, 419], [25, 452], [15, 479], [0, 479], [10, 449], [13, 417], [25, 392], [45, 369], [50, 352]], '#eed1a0');
-  canvas.line(50, 345, 51, 361, '#ffe0a8');
-  canvas.polygon([[416, 240], [432, 240], [442, 234], [451, 218], [459, 216], [455, 232], [439, 251], [415, 252]], '#efd4a4');
+  wetSandTexture(canvas);
+  return materials;
 }
 
 function terrainTexture(canvas) {
@@ -242,6 +231,35 @@ function terrainTexture(canvas) {
   }
 }
 
+const materialColors = new Map([
+  [1, ['#b8bb75', '#94aa68', '#829c63', '#a8b36e', '#b6b777', '#a6ae6d']],
+  [2, ['#f5d8a2', '#e7c99a']],
+  [3, [earth, '#d1bb79']],
+].flatMap(([material, colors]) => colors.map(color => [Buffer.from(hex(color)).readUInt32BE(), material])));
+
+function defaultMaterials(canvas) {
+  const defaults = new Canvas(gridWidth, gridHeight);
+  for (let row = 0; row < gridHeight; row++) {
+    for (let col = 0; col < gridWidth; col++) {
+      const center = [col * grid + grid / 2, row * grid + grid / 2];
+      const offset = (center[1] * world.width + center[0]) * 4;
+      const material = materialColors.get(canvas.data.readUInt32BE(offset)) ?? 4;
+      defaults.pixel(col, row, [material, 0, 0, 255]);
+    }
+  }
+  return defaults;
+}
+
+function wetSandTexture(canvas) {
+  for (let index = 0; index < 100; index++) {
+    const y = world.top + 6 + randomInt(world.height - 12);
+    const x = coast[y - world.top] - 10 - randomInt(15);
+    if (y >= 112 && y <= 158) continue;
+    canvas.rect(x, y, 2 + randomInt(3), 1, '#e5c38f');
+    canvas.pixel(x + 1, y - 1, index % 5 === 0 ? '#d6a981' : '#f9e2b1');
+  }
+}
+
 function palm(canvas, x, y, size = 1, lean = 1) {
   function points(pairs) {
     return pairs.map(([dx, dy]) => [x + Math.round(dx * size * lean), y + Math.round(dy * size)]);
@@ -264,8 +282,7 @@ function palm(canvas, x, y, size = 1, lean = 1) {
   canvas.rect(coconutX - 2, coconutY, 4, 3, '#6c5645');
 }
 
-function duneGrove(canvas, x, y, lean, size) {
-  palm(canvas, x, y, size, lean);
+function shrub(canvas, x, y) {
   canvas.oval(x - 7, y + 7, 18, 5, '#9da570');
   canvas.oval(x - 15, y + 4, 10, 5, '#729358');
   canvas.oval(x - 5, y + 2, 9, 6, '#658854');
@@ -277,33 +294,156 @@ function duneGrove(canvas, x, y, lean, size) {
   }
 }
 
-function shoreDetails(canvas) {
-  for (const [x, y, lean, size] of [
-    [-128, -35, 1, 0.92], [-78, -4, -1, 1.18], [14, -32, 1, 1.03], [94, -48, -1, 0.91],
-    [179, -55, -1, 1.14], [224, -20, 1, 0.78], [329, -51, 1, 1.05], [389, -3, -1, 0.86],
-    [-122, 62, 1, 1.03], [-53, 133, 1, 1.25], [-111, 188, -1, 0.93], [-85, 260, 1, 1.08],
-    [-123, 342, -1, 1.2], [-51, 355, 1, 0.95], [-71, 430, -1, 1.13], [77, 411, -1, 1.06],
-    [118, 370, 1, 1.0], [165, 332, -1, 0.96], [179, 418, -1, 1.16], [233, 379, 1, 0.87],
-    [276, 451, 1, 0.99], [317, 393, -1, 1.10], [368, 343, -1, 0.87], [415, 305, 1, 0.75],
-  ]) duneGrove(canvas, x, y, lean, size);
+const groves = [
+  [-128, -35, 1, 0.92], [-78, -4, -1, 1.18], [14, -32, 1, 1.03], [94, -48, -1, 0.91],
+  [179, -55, -1, 1.14], [224, -20, 1, 0.78], [329, -51, 1, 1.05], [389, -3, -1, 0.86],
+  [-122, 62, 1, 1.03], [-53, 133, 1, 1.25], [-111, 188, -1, 0.93], [-85, 260, 1, 1.08],
+  [-123, 342, -1, 1.2], [-51, 355, 1, 0.95], [-71, 430, -1, 1.13], [77, 411, -1, 1.06],
+  [118, 370, 1, 1.0], [165, 332, -1, 0.96], [179, 418, -1, 1.16], [233, 379, 1, 0.87],
+  [276, 451, 1, 0.99], [317, 393, -1, 1.10], [368, 343, -1, 0.87], [415, 305, 1, 0.75],
+];
+const palms = [
+  [20, 40, 1, 0.82], [96, 20, -1, 0.65], [183, 28, 1, 0.64], [269, 31, -1, 0.68],
+  [340, 56, 1, 1.08], [391, 56, 1, 0.94], [440, 106, -1, 0.75], [460, 142, 1, 0.55],
+  [-8, 190, 1, 0.83], [467, 194, -1, 0.52], [2, 281, 1, 0.83], [128, 288, -1, 0.77],
+  [196, 294, 1, 0.8], [292, 279, 1, 0.76],
+];
 
-  for (let index = 0; index < 100; index++) {
-    const y = world.top + 6 + randomInt(world.height - 12);
-    const x = coast[y - world.top] - 10 - randomInt(15);
-    if (y >= 112 && y <= 158) continue;
-    canvas.rect(x, y, 2 + randomInt(3), 1, '#e5c38f');
-    canvas.pixel(x + 1, y - 1, index % 5 === 0 ? '#d6a981' : '#f9e2b1');
-  }
+function rock(canvas, x, y, rotation) {
+  const facing = [1, 0.75, -1, -0.75][rotation];
+  const points = pairs => pairs.map(([dx, dy]) => [x + Math.round(dx * facing), y + dy]);
+  canvas.oval(x + 1, y + 2, 9, 3, '#b79b7a');
+  canvas.polygon(points([[-7, 1], [-8, -1], [-5, -6], [3, -8], [7, -5], [8, 0], [3, 2]]), '#878477');
+  canvas.polygon(points([[-7, -1], [-4, -5], [3, -7], [6, -5], [1, -2], [-4, 0]]), '#b6a78d');
+  canvas.line(...points([[-4, -5], [1, -6]]).flat(), '#d2bb99');
+  canvas.line(...points([[1, -2], [4, 0]]).flat(), '#a4937e');
 }
 
-function terrain() {
-  const canvas = new Canvas(world.width, world.height, world.left, world.top);
-  ground(canvas);
-  shoreDetails(canvas);
-  for (const [x, y, size, lean] of [[20, 40, 0.82, 1], [96, 20, 0.65, -1], [183, 28, 0.64, 1], [269, 31, 0.68, -1], [340, 56, 1.08, 1], [391, 56, 0.94, 1], [440, 106, 0.75, -1], [460, 142, 0.55, 1], [-8, 190, 0.83, 1], [467, 194, 0.52, -1], [2, 281, 0.83, 1], [128, 288, 0.77, -1], [196, 294, 0.8, 1], [292, 279, 0.76, 1]]) {
-    palm(canvas, x, y, size, lean);
+const palmSizes = [...new Set([1, ...groves.map(palm => palm[3]), ...palms.map(palm => palm[3])])];
+const propCell = 96;
+const propAnchor = [44, 67];
+
+function landscapeProps() {
+  const props = [];
+  const reserve = new Set();
+  function place(kind, x, y, variant = 0, rotation = 0) {
+    const cell = [Math.floor(x / grid), Math.floor(y / grid)];
+    if (reserve.has(cell.join(','))) return false;
+    reserve.add(cell.join(','));
+    props.push({kind, cell, offset: [x - cell[0] * grid, y - cell[1] * grid], variant, rotation});
+    return true;
   }
-  return canvas;
+  for (const [x, y, lean, size] of [...groves, ...palms]) {
+    place('palm', x, y, palmSizes.indexOf(size), lean > 0 ? 0 : 2);
+  }
+  for (const [x, y] of groves) place('bush', x - 8, y + 4);
+  for (const [x, y, rotation] of [[-95, 301, 1], [37, 431, 2], [365, 406, 3], [454, 69, 0]]) {
+    place('rock', x, y, 0, rotation);
+  }
+  place('beach_flag', 477, 158);
+  return props;
+}
+
+function landscapePropAtlas() {
+  const atlas = new Canvas(propCell * 4, propCell * (palmSizes.length + 2));
+  for (let rotation = 0; rotation < 4; rotation++) {
+    const x = rotation * propCell + propAnchor[0];
+    for (const [variant, size] of palmSizes.entries()) {
+      palm(atlas, x, variant * propCell + propAnchor[1], size, [1, 0.62, -1, -0.62][rotation]);
+    }
+    const bushY = palmSizes.length * propCell + propAnchor[1];
+    const bush = new Canvas(propCell, propCell);
+    shrub(bush, propAnchor[0] + 8, propAnchor[1] - 4);
+    for (let y = propAnchor[1] - 10; y < propAnchor[1] + 10; y++) {
+      for (let col = propAnchor[0] - 23; col < propAnchor[0] + 23; col++) {
+        const pixel = (y * propCell + col) * 4;
+        if (bush.data[pixel + 3] === 0) continue;
+        const dx = col - propAnchor[0];
+        const sideStep = [0, -2, 0, 0][rotation];
+        const bend = [1, 0.75, -1, -0.75][rotation];
+        atlas.pixel(x + sideStep + Math.round(dx * bend), bushY + y - propAnchor[1], bush.data.subarray(pixel, pixel + 4));
+      }
+    }
+    rock(atlas, x, bushY + propCell, rotation);
+  }
+  return atlas;
+}
+
+function connectStarterPaths(defaults, props) {
+  const occupied = new Set(props.map(prop => prop.cell.join(',')));
+  const startBuildings = [
+    ...Array.from({length: 4}, (_, index) => [24 + index * 72, 48, 64, 80]),
+    [32, 160, 112, 72], [160, 160, 120, 72], [312, 160, 144, 80],
+  ];
+  function tile(x, y, path) {
+    if (occupied.has([x / grid, y / grid].join(','))) return;
+    if (startBuildings.some(([l, t, w, h]) => x < l + w && x + grid > l && y < t + h && y + grid > t)) return;
+    for (let row = y - world.top; row < y - world.top + grid; row++) {
+      if (x + grid > coast[row]) return;
+    }
+    const col = (x - world.left) / grid;
+    const row = (y - world.top) / grid;
+    const material = defaults.data[(row * gridWidth + col) * 4];
+    defaults.pixel(col, row, [material, path, 0, 255]);
+  }
+  for (let x = 40; x <= 456; x += grid) {
+    tile(x, 240, 1);
+    tile(x, 248, 1);
+  }
+  for (let x = 56; x <= 272; x += grid) tile(x, 144, 1);
+  for (const x of [56, 128, 200, 272]) {
+    tile(x, 128, 1);
+    tile(x, 136, 1);
+  }
+  for (let y = 152; y < 240; y += grid) tile(144, y, 1);
+  for (const x of [88, 224]) tile(x, 232, 1);
+  for (let row = 256; row < 480; row += grid) {
+    const progress = Math.max(0, (row - 352) / 128);
+    const center = 56 - Math.min(48, Math.round(Math.sin(progress * 1.4) * 48 / grid) * grid);
+    tile(center - grid, row, 2);
+    tile(center, row, 2);
+  }
+  for (let y = 216; y < 240; y += grid) tile(456, y, 1);
+}
+
+function landscapeMaterials() {
+  const span = 32;
+  const atlas = new Canvas(span * 6, span);
+  const colors = [
+    ['#a8b36e', '#b9bf7f', '#97a469'], ['#f5d8a2', '#fae2b0', '#e8c28d'],
+    [earth, '#edc99b', '#d9ac83'], ['#72b5ac', '#7ebeb0', '#65a9a4'],
+    ['#f5d9aa', '#fae0b1', '#e7c797'], ['#cca076', '#ddae7f', '#ad805f'],
+  ];
+  randomState = 69103;
+  for (const [index, [base, light, dark]] of colors.entries()) {
+    const left = index * span;
+    atlas.rect(left, 0, span, span, base);
+    for (let fleck = 0; fleck < 80; fleck++) {
+      const x = randomInt(span);
+      const y = randomInt(span);
+      atlas.rect(left + x, y, Math.min(span - x, randomInt(index === 3 ? 6 : 3) + 1), 1, fleck % 3 ? light : dark);
+      if (index === 0 && fleck % 7 === 0 && x > 0) atlas.pixel(left + x - 1, Math.max(0, y - 1), dark);
+    }
+  }
+  // Staggered pavers and laid boards share pixels across tile boundaries.
+  for (let y = 0; y < span; y += 8) {
+    const stone = span * 4;
+    const boards = span * 5;
+    atlas.rect(stone, y + 7, span, 1, '#dfbd8e');
+    atlas.rect(stone, y, span, 1, '#fbe0b3');
+    atlas.rect(boards, y + 7, span, 1, '#9f6f53');
+    atlas.rect(boards, y, span, 1, '#e3b68b');
+    for (let segment = 0; segment < 4; segment++) {
+      const stagger = (segment * 8 + (y % 16 === 0 ? 12 : 4)) % span;
+      atlas.rect(stone + stagger, y + 1, 1, 6, '#e7c797');
+      if (segment % 2 === 0) {
+        atlas.rect(boards + stagger, y + 1, 1, 6, '#ae805e');
+        atlas.pixel(boards + stagger + 1, y + 2, '#936e56');
+        atlas.pixel(boards + stagger + 1, y + 5, '#936e56');
+      }
+    }
+  }
+  return atlas;
 }
 
 // The model owns placement. Atlas cells are 32 × 32, with art at the top left
@@ -516,7 +656,15 @@ function appIcon() {
 
 const people = new Canvas(80, 120);
 const shoreProfile = new Canvas(1, world.height);
-terrain().save('resort.png');
+const terrain = new Canvas(world.width, world.height, world.left, world.top);
+const defaults = ground(terrain);
+const startProps = landscapeProps();
+connectStarterPaths(defaults, startProps);
+terrain.save('resort.png');
+defaults.save('landscape_defaults.png');
+landscapeMaterials().save('landscape_materials.png');
+landscapePropAtlas().save('landscape_props.png');
+writeFileSync(fileURLToPath(new URL('landscape_props.json', import.meta.url)), `${JSON.stringify(startProps, null, 2)}\n`);
 furnitureAtlas().save('furniture.png');
 // Red/green hold the low/high bytes of the first water pixel in each image row.
 for (const [row, shore] of coast.entries()) {

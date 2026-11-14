@@ -1,6 +1,18 @@
 # Asset integration contract
 
-## Revision 3 current building contract
+## Revision 6 restaurant interaction
+
+`resort_map.gd` derives food collection, plate carrying, table approach, seated eating and departure from actual simulation phases and `Layout.dining_tables()` records. Seated sprites use compact cropped silhouettes, chair/knee details and animated hands; plates remain visible above the seated bodies. Meal details use the same exterior/ceiling concealment as guests. No furniture is baked into a background or assigned a fake fixed dining location. See `dining-visuals.md` for the reusable headless CPU preview/test and `revision-6.md` for reservations and timing.
+
+## Revision 5 building appearance
+
+The modular building renderer owns physical name plaques, floor/wall finish patterns, complete exterior roofs/facades and explicit selected-building ceiling inspection. `set_view(exterior, ceiling_building_id)` changes presentation only; pool furnishings and activity stay outdoors. Names and three surface finish IDs come from layout metadata rather than duplicated UI constants. See `revision-5.md` and `building-appearance.md` for the current appearance contract; exterior roofing is distinct from the selected indoor ceiling finish.
+
+## Revision 4 current landscape contract
+
+The base `resort.png` contains only natural terrain/coast texture. All original scenery and paths are editable data. `landscape_defaults.png` encodes the 120×75 grid (red: grass/sand/dirt/water IDs; green: none/stone/boardwalk path IDs), and `landscape_props.json` supplies the initial scenery objects. Include the JSON explicitly in exported resources. `landscape_materials.png` and `landscape_props.png` supply live paint/prop art. The landscape model is authoritative for edited land material, path and prop state. Following the user's fixed-coast choice, water IDs/textures describe the baseline ocean only; original shore pixels remain authoritative and no water/coast editing is exposed or accepted. See `revision-4.md` and `landscape-art.md` for the current contract.
+
+## Revision 3 building contract (still used)
 
 `resort.png` is now terrain-only. Buildings and furniture are rendered from `scripts/layout_model.gd` through `scripts/building_renderer.gd`; their locations and sizes are editable. The furniture atlas `assets/art/furniture.png` supplies eight asset rows with four rotations at a 32-pixel cell stride. The fixed `resort_pool_upgrade.png` is retained only as a legacy artifact and must not be drawn by the current game. Use `modular-art.md` for the renderer API and `revision-3.md` for construction behavior. World bounds and the ocean shoreline profile below remain valid.
 

@@ -19,15 +19,14 @@ const TEAL := Color("#235c54")
 const TEAL_HOVER := Color("#316e63")
 const MARGIN := 16.0
 const SPEEDS := [1, 2, 4]
-const STATIONS := ["Reception", "Buffet", "Pool"]
 const PANELS := {
 	"package": ["Booking", "Booking desk", "Choose a package and set the room price", Vector2(372, 224)],
-	"staff": ["Staff", "Staff assignments", "Assign the floating worker", Vector2(344, 254)],
+	"staff": ["Staff", "Staff assignments", "Assign the floating worker and check dining capacity", Vector2(344, 282)],
 	"pool": ["Pool", "Pool terrace", "Check the pool terrace", Vector2(320, 192)],
 	"reviews": ["Reviews", "Latest review", "Read the latest guest review", Vector2(336, 192)],
 	"goals": ["Goals", "Day 3 targets", "Check the opening weekend targets", Vector2(330, 224)],
 	"settings": ["Settings", "Settings", "Save, load, or change sound (Esc)", Vector2(320, 236)],
-	"design": ["Build", "Build and furnish", "Draw and furnish buildings", Vector2.ZERO],
+	"design": ["Build", "Design mode", "Draw buildings, place furniture and edit the landscape", Vector2.ZERO],
 }
 
 class PixelIcon extends Control:
@@ -60,6 +59,8 @@ class PixelIcon extends Control:
 
 var _status: Panel
 var _transport: Panel
+var _view_control: Panel
+var _building_view: Button
 var _dock: Panel
 var _camera: Panel
 var _toast: Panel
@@ -97,6 +98,7 @@ func _ready() -> void:
 	theme.set_color("font_color", "TooltipLabel", CREAM)
 	_build_status()
 	_build_transport()
+	_build_view_control()
 	_build_dock()
 	_build_camera()
 	_toast = _surface(self, Rect2(0, 0, 350, 37), CHROME, CHROME_EDGE)
@@ -126,6 +128,10 @@ func refresh(data: Dictionary) -> void:
 	_pause.set_pressed_no_signal(paused)
 	for i in range(_speed_buttons.size()):
 		_speed_buttons[i].set_pressed_no_signal(SPEEDS[i] == data.get("speed", 1))
+	var exterior: bool = data.get("exterior_view", false)
+	_building_view.text = "Show interiors" if exterior else "Show exterior"
+	_building_view.accessibility_name = _building_view.text
+	_building_view.tooltip_text = "Reveal the interiors of all buildings." if exterior else "Show roofs and façades for all enclosed buildings."
 	_set_notice(data.get("notice", ""))
 	var has_pending: bool = data.get("has_pending", false)
 	_dock_labels.design.text = "Build ·" if has_pending else "Build"
@@ -257,6 +263,13 @@ func _build_dock() -> void:
 		i += 1
 
 
+func _build_view_control() -> void:
+	_view_control = _surface(self, Rect2(0, 0, 143, 50), CHROME, CHROME_EDGE)
+	_surfaces.append(_view_control)
+	_building_view = _button(_view_control, Rect2(6, 6, 131, 38), "Show exterior", _request.bind("building_view"), true)
+	_building_view.name = "BuildingView"
+
+
 func _build_camera() -> void:
 	_camera = _surface(self, Rect2(0, 0, 154, 50), CHROME, CHROME_EDGE)
 	_camera.tooltip_text = "Drag the resort to explore. Scroll to zoom."
@@ -291,12 +304,13 @@ func _build_package() -> void:
 
 func _build_staff() -> void:
 	var options: Array[Button] = []
-	for i in range(STATIONS.size()):
+	for i in range(Sim.STATIONS.size()):
 		var option := _button(_popover, Rect2(14, 57 + i * 49, 316, 42), "", _request.bind("staff", i), false, true)
-		option.tooltip_text = "Assign the floating worker to %s" % STATIONS[i].to_lower()
+		option.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		options.append(option)
 	_body.options = options
-	_label(_popover, Rect2(15, 211, 314, 27), "The floating worker adds one service slot.", 14, MUTED)
+	_body.tables = _label(_popover, Rect2(15, 209, 314, 25), "", 15, INK)
+	_label(_popover, Rect2(15, 239, 314, 27), "Extra dining tables are available in Build.", 14, MUTED)
 
 
 func _build_pool() -> void:
@@ -348,12 +362,16 @@ func _refresh_panel(sim: Sim) -> void:
 				var booked: Dictionary = Sim.PACKAGES[sim.booked_package]
 				_body.booking.text = "Booked today · %d families · %s $%d" % [sim.booked_count, booked.name, booked.price]
 		"staff":
-			for i in range(STATIONS.size()):
+			for i in range(Sim.STATIONS.size()):
 				var option: Button = _body.options[i]
 				var selected := i == sim.float_station
-				option.text = "%s%s   %d/%d active · %d waiting" % [STATIONS[i], " +1" if selected else "", sim.count_at(i, "service"), sim.capacity(i), sim.count_at(i, "queue")]
+				var station := sim.station_name(i)
+				var service := "%d/%d collecting · %d in buffet line" if i == 1 else "%d/%d active · %d waiting"
+				option.text = "%s%s\n%s" % [station, " +1" if selected else "", service % [sim.count_at(i, "service"), sim.capacity(i), sim.count_at(i, "queue")]]
+				option.tooltip_text = "Assign the floating worker to %s for one more service slot" % station
 				option.accessibility_name = option.text
 				option.set_pressed_no_signal(selected)
+			_body.tables.text = "Tables %d/%d in use · %d waiting to eat" % [sim.occupied_tables(), sim.layout.dining_tables().size(), sim.count_at(1, "wait_table")]
 		"pool":
 			_body.pool_status.text = "Terrace installed" if sim.terrace else "Terrace needs furnishings"
 		"reviews":
@@ -384,6 +402,7 @@ func _refresh_panel(sim: Sim) -> void:
 
 func _layout() -> void:
 	_transport.position = Vector2(size.x - MARGIN - _transport.size.x, MARGIN)
+	_view_control.position = Vector2(_status.position.x + _status.size.x + 10.0, MARGIN)
 	_dock.position = Vector2(MARGIN, size.y - MARGIN - _dock.size.y)
 	_camera.position = Vector2(size.x - MARGIN - _camera.size.x, size.y - MARGIN - _camera.size.y)
 	_layout_toast()

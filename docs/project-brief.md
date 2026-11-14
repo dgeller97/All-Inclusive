@@ -2,7 +2,7 @@
 
 ## Current revision
 
-Revision 3 adds editable grid-based structures and furniture, Regular construction costs, Developer free build, staged layout application and save migration. The original first-playable brief below remains the baseline management loop; use `revision-3.md`, `design-mode-ui.md` and `modular-art.md` for current construction requirements and ownership. In particular, the pool improvement now comes from actual placed furniture rather than the original one-click upgrade.
+Revision 6 adds real restaurant interaction: guests collect food at the editable buffet counter, reserve a reachable table, sit/eat and depart from the table. Use `revision-6.md` for current ownership, timing and save contracts. Revision 5's exterior view, named signs and building finishes remain. Revision 4's editable dry-land terrain, functional paths and scenery retain the user's fixed coast. `revision-3.md`, `design-mode-ui.md` and `modular-art.md` cover construction, Regular costs, Developer free building and staged application. The original brief below remains the baseline management loop; the pool improvement comes from actual placed furniture rather than the original one-click upgrade.
 
 ## Outcome
 

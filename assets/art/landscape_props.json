@@ -1,0 +1,873 @@
+[
+  {
+    "kind": "palm",
+    "cell": [
+      -16,
+      -5
+    ],
+    "offset": [
+      0,
+      5
+    ],
+    "variant": 1,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -10,
+      -1
+    ],
+    "offset": [
+      2,
+      4
+    ],
+    "variant": 2,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      1,
+      -4
+    ],
+    "offset": [
+      6,
+      0
+    ],
+    "variant": 3,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      11,
+      -6
+    ],
+    "offset": [
+      6,
+      0
+    ],
+    "variant": 4,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      22,
+      -7
+    ],
+    "offset": [
+      3,
+      1
+    ],
+    "variant": 5,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      28,
+      -3
+    ],
+    "offset": [
+      0,
+      4
+    ],
+    "variant": 6,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      41,
+      -7
+    ],
+    "offset": [
+      1,
+      5
+    ],
+    "variant": 7,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      48,
+      -1
+    ],
+    "offset": [
+      5,
+      5
+    ],
+    "variant": 8,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -16,
+      7
+    ],
+    "offset": [
+      6,
+      6
+    ],
+    "variant": 3,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -7,
+      16
+    ],
+    "offset": [
+      3,
+      5
+    ],
+    "variant": 9,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -14,
+      23
+    ],
+    "offset": [
+      1,
+      4
+    ],
+    "variant": 10,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -11,
+      32
+    ],
+    "offset": [
+      3,
+      4
+    ],
+    "variant": 11,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -16,
+      42
+    ],
+    "offset": [
+      5,
+      6
+    ],
+    "variant": 12,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -7,
+      44
+    ],
+    "offset": [
+      5,
+      3
+    ],
+    "variant": 13,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -9,
+      53
+    ],
+    "offset": [
+      1,
+      6
+    ],
+    "variant": 14,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      9,
+      51
+    ],
+    "offset": [
+      5,
+      3
+    ],
+    "variant": 15,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      14,
+      46
+    ],
+    "offset": [
+      6,
+      2
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      20,
+      41
+    ],
+    "offset": [
+      5,
+      4
+    ],
+    "variant": 16,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      22,
+      52
+    ],
+    "offset": [
+      3,
+      2
+    ],
+    "variant": 17,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      29,
+      47
+    ],
+    "offset": [
+      1,
+      3
+    ],
+    "variant": 18,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      34,
+      56
+    ],
+    "offset": [
+      4,
+      3
+    ],
+    "variant": 19,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      39,
+      49
+    ],
+    "offset": [
+      5,
+      1
+    ],
+    "variant": 20,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      46,
+      42
+    ],
+    "offset": [
+      0,
+      7
+    ],
+    "variant": 18,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      51,
+      38
+    ],
+    "offset": [
+      7,
+      1
+    ],
+    "variant": 21,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      2,
+      5
+    ],
+    "offset": [
+      4,
+      0
+    ],
+    "variant": 22,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      12,
+      2
+    ],
+    "offset": [
+      0,
+      4
+    ],
+    "variant": 23,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      22,
+      3
+    ],
+    "offset": [
+      7,
+      4
+    ],
+    "variant": 24,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      33,
+      3
+    ],
+    "offset": [
+      5,
+      7
+    ],
+    "variant": 25,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      42,
+      7
+    ],
+    "offset": [
+      4,
+      0
+    ],
+    "variant": 11,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      48,
+      7
+    ],
+    "offset": [
+      7,
+      0
+    ],
+    "variant": 26,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      55,
+      13
+    ],
+    "offset": [
+      0,
+      2
+    ],
+    "variant": 21,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      57,
+      17
+    ],
+    "offset": [
+      4,
+      6
+    ],
+    "variant": 27,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      -1,
+      23
+    ],
+    "offset": [
+      0,
+      6
+    ],
+    "variant": 28,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      58,
+      24
+    ],
+    "offset": [
+      3,
+      2
+    ],
+    "variant": 29,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      0,
+      35
+    ],
+    "offset": [
+      2,
+      1
+    ],
+    "variant": 28,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      16,
+      36
+    ],
+    "offset": [
+      0,
+      0
+    ],
+    "variant": 30,
+    "rotation": 2
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      24,
+      36
+    ],
+    "offset": [
+      4,
+      6
+    ],
+    "variant": 31,
+    "rotation": 0
+  },
+  {
+    "kind": "palm",
+    "cell": [
+      36,
+      34
+    ],
+    "offset": [
+      4,
+      7
+    ],
+    "variant": 32,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -17,
+      -4
+    ],
+    "offset": [
+      0,
+      1
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -11,
+      0
+    ],
+    "offset": [
+      2,
+      0
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      0,
+      -4
+    ],
+    "offset": [
+      6,
+      4
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      10,
+      -6
+    ],
+    "offset": [
+      6,
+      4
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      21,
+      -7
+    ],
+    "offset": [
+      3,
+      5
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      27,
+      -2
+    ],
+    "offset": [
+      0,
+      0
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      40,
+      -6
+    ],
+    "offset": [
+      1,
+      1
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      47,
+      0
+    ],
+    "offset": [
+      5,
+      1
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -17,
+      8
+    ],
+    "offset": [
+      6,
+      2
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -8,
+      17
+    ],
+    "offset": [
+      3,
+      1
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -15,
+      24
+    ],
+    "offset": [
+      1,
+      0
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -12,
+      33
+    ],
+    "offset": [
+      3,
+      0
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -17,
+      43
+    ],
+    "offset": [
+      5,
+      2
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -8,
+      44
+    ],
+    "offset": [
+      5,
+      7
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      -10,
+      54
+    ],
+    "offset": [
+      1,
+      2
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      8,
+      51
+    ],
+    "offset": [
+      5,
+      7
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      13,
+      46
+    ],
+    "offset": [
+      6,
+      6
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      19,
+      42
+    ],
+    "offset": [
+      5,
+      0
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      21,
+      52
+    ],
+    "offset": [
+      3,
+      6
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      28,
+      47
+    ],
+    "offset": [
+      1,
+      7
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      33,
+      56
+    ],
+    "offset": [
+      4,
+      7
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      38,
+      49
+    ],
+    "offset": [
+      5,
+      5
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      45,
+      43
+    ],
+    "offset": [
+      0,
+      3
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "bush",
+    "cell": [
+      50,
+      38
+    ],
+    "offset": [
+      7,
+      5
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "rock",
+    "cell": [
+      -12,
+      37
+    ],
+    "offset": [
+      1,
+      5
+    ],
+    "variant": 0,
+    "rotation": 1
+  },
+  {
+    "kind": "rock",
+    "cell": [
+      4,
+      53
+    ],
+    "offset": [
+      5,
+      7
+    ],
+    "variant": 0,
+    "rotation": 2
+  },
+  {
+    "kind": "rock",
+    "cell": [
+      45,
+      50
+    ],
+    "offset": [
+      5,
+      6
+    ],
+    "variant": 0,
+    "rotation": 3
+  },
+  {
+    "kind": "rock",
+    "cell": [
+      56,
+      8
+    ],
+    "offset": [
+      6,
+      5
+    ],
+    "variant": 0,
+    "rotation": 0
+  },
+  {
+    "kind": "beach_flag",
+    "cell": [
+      59,
+      19
+    ],
+    "offset": [
+      5,
+      6
+    ],
+    "variant": 0,
+    "rotation": 0
+  }
+]

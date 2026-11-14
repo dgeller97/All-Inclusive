@@ -6,11 +6,16 @@ const DAY_LENGTH := 240
 const FINAL_DAY := 3
 const OPEN_BOOKINGS := 20
 const PAYROLL := 120
+const MEAL_VERSION := 1
+const TABLE_WALK_DURATION := 4
+const EAT_DURATION := 12
+const LEGACY_BUFFET_DURATION := 18
 const Layout = preload("res://scripts/layout_model.gd")
 const STATIONS := ["reception", "buffet", "pool"]
-const DURATIONS := [8, 18, 20]
-const PHASES := ["queue", "service", "to_room", "settle", "to_buffet", "to_pool",
+const DURATIONS := [8, 6, 20]
+const PHASES := ["queue", "service", "to_room", "settle", "to_buffet", "wait_table", "to_table", "eating", "to_pool",
 	"return_room", "rest", "to_checkout", "exit", "gone"]
+const TABLE_RESERVATION_PHASES := ["to_table", "eating"]
 const PACKAGES := [
 	{"name": "Budget", "price": 90, "bookings": 4, "value": 5, "cue": "Better value"},
 	{"name": "Standard", "price": 120, "bookings": 4, "value": 0, "cue": "Balanced value"},
@@ -60,6 +65,10 @@ func count_at(station: int, phase: String) -> int:
 	return count
 
 
+func occupied_tables() -> int:
+	return count_at(1, "to_table") + count_at(1, "eating")
+
+
 func family_in_room(room_index: int) -> Dictionary:
 	for family in families:
 		if family.id == rooms[room_index]:
@@ -105,6 +114,17 @@ func construction_status(draft: Layout) -> Dictionary:
 		"refund": quote.refund, "net": quote.net, "available": available,
 		"defer": must_defer_construction(),
 	}
+
+
+func station_name(station: int) -> String:
+	return Layout.building_name(layout.building_at(layout.station_point(station)))
+
+
+func room_name(index: int) -> String:
+	var points := layout.room_points()
+	if index >= 0 and index < points.size():
+		return Layout.building_name(layout.building_at(points[index]))
+	return "Room %s" % char(65 + index)
 
 
 func apply_construction(draft: Layout) -> Dictionary:
@@ -171,6 +191,7 @@ func tick() -> void:
 		if family.phase == "rest" and second >= 200 + family.id * 8:
 			_transition(family, "to_checkout", 4)
 	_start_queued_services()
+	_seat_diners()
 
 
 func _arrive() -> void:
@@ -178,6 +199,7 @@ func _arrive() -> void:
 		"id": families.size(), "room": -1, "station": 0, "phase": "queue",
 		"since": second, "until": -1, "joined": second,
 		"waits": [0, 0, 0], "upgraded_swim": false, "slot": -1,
+		"table_id": -1, "dining_wait": 0,
 	}
 	families.append(family)
 
@@ -230,6 +252,34 @@ func _start_queued_services() -> void:
 				break
 
 
+func _seat_diners() -> void:
+	var waiting: Array[Dictionary] = []
+	var reserved := {}
+	for family in families:
+		if family.phase == "wait_table":
+			waiting.append(family)
+		elif family.phase in TABLE_RESERVATION_PHASES:
+			reserved[family.table_id] = true
+	if waiting.is_empty():
+		return
+	waiting.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if a.since == b.since:
+			return a.id < b.id
+		return a.since < b.since
+	)
+	var next := 0
+	for table in layout.dining_tables():
+		if reserved.has(table.id):
+			continue
+		var family := waiting[next]
+		family.table_id = table.id
+		family.dining_wait = second - family.since
+		_transition(family, "to_table", TABLE_WALK_DURATION)
+		next += 1
+		if next == waiting.size():
+			break
+
+
 func _advance(family: Dictionary) -> void:
 	match family.phase:
 		"service":
@@ -245,7 +295,9 @@ func _advance(family: Dictionary) -> void:
 					_transition(family, "to_room", 4)
 					event_happened.emit(&"checkin", {"room": room, "price": PACKAGES[booked_package].price})
 				1:
-					_transition(family, "to_pool", 4)
+					family.erase("legacy_meal")
+					family.slot = -1
+					_transition(family, "wait_table")
 				2:
 					_transition(family, "return_room", 4)
 		"to_room":
@@ -254,7 +306,13 @@ func _advance(family: Dictionary) -> void:
 			_transition(family, "to_buffet", 4)
 		"to_buffet":
 			_queue(family, 1)
+		"to_table":
+			_transition(family, "eating", EAT_DURATION)
+		"eating":
+			_transition(family, "to_pool", 4)
 		"to_pool":
+			family.erase("legacy_meal")
+			family.table_id = -1
 			_queue(family, 2)
 		"return_room":
 			_transition(family, "rest")
@@ -272,13 +330,17 @@ func _checkout(family: Dictionary) -> void:
 	var longest_penalty := 0
 	var station_index := -1
 	for station in range(STATIONS.size()):
-		var penalty := mini(14, floori(float(maxi(0, family.waits[station] - 6)) / 2.0))
+		var penalty := _wait_penalty(family.waits[station])
 		score -= penalty
 		if penalty > longest_penalty:
 			longest_penalty = penalty
 			station_index = station
+	var dining_penalty := _wait_penalty(family.dining_wait)
+	score -= dining_penalty
 	var note: String
-	if station_index >= 0:
+	if dining_penalty > 0 and dining_penalty >= longest_penalty:
+		note = "Long dining table wait"
+	elif station_index >= 0:
 		note = "Long %s line" % STATIONS[station_index]
 	elif family.upgraded_swim:
 		note = "Loved the pool terrace"
@@ -290,10 +352,14 @@ func _checkout(family: Dictionary) -> void:
 		note = "Good value for the family"
 	var review := {
 		"day": day, "room": family.room, "score": clampi(score, 0, 100),
-		"note": note, "waits": family.waits.duplicate(),
+		"note": note, "waits": family.waits.duplicate(), "dining_wait": family.dining_wait,
 	}
 	reviews.append(review)
 	event_happened.emit(&"review", review)
+
+
+func _wait_penalty(wait: int) -> int:
+	return mini(14, floori(float(maxi(0, wait - 6)) / 2.0))
 
 
 func _close_day() -> void:
@@ -331,6 +397,7 @@ func _open_next_day() -> void:
 
 func snapshot() -> Dictionary:
 	return {
+		"meal_version": MEAL_VERSION,
 		"day": day, "second": second, "cash": cash,
 		"selected_package": selected_package, "booked_package": booked_package,
 		"float_station": float_station, "terrace": terrace, "stopped": stopped,
@@ -343,7 +410,12 @@ func snapshot() -> Dictionary:
 	}
 
 
-func restore(data: Dictionary, legacy: bool = false) -> bool:
+func restore(data: Dictionary, legacy: bool = false, require_landscape: bool = false, require_meals: bool = false) -> bool:
+	var has_meals := data.has("meal_version")
+	if has_meals and (not data.meal_version is int or data.meal_version != MEAL_VERSION):
+		return false
+	if require_meals and not has_meals:
+		return false
 	for field in ["day", "second", "cash", "selected_package", "booked_package", "float_station"]:
 		if not data.get(field) is int:
 			return false
@@ -375,6 +447,8 @@ func restore(data: Dictionary, legacy: bool = false) -> bool:
 	else:
 		if data.get("mode") not in ["regular", "developer"] or not data.get("layout") is Dictionary:
 			return false
+		if require_landscape and not data.layout.get("landscape") is Dictionary:
+			return false
 		if not restored_layout.restore(data.layout):
 			return false
 		restored_mode = data.mode
@@ -384,8 +458,14 @@ func restore(data: Dictionary, legacy: bool = false) -> bool:
 		if not data.get("pending_layout") is Dictionary or not data.get("pending_reserve") is int:
 			return false
 		if not data.pending_layout.is_empty():
+			if require_landscape and not data.pending_layout.get("landscape") is Dictionary:
+				return false
 			restored_pending = Layout.new()
-			if not restored_pending.restore(data.pending_layout) or not restored_pending.readiness().ok:
+			if not restored_pending.restore(data.pending_layout):
+				return false
+			if not data.pending_layout.has("landscape"):
+				prune_migrated_scenery(restored_pending, restored_layout)
+			if not restored_pending.readiness().ok:
 				return false
 			var quote := restored_pending.quote_diff(restored_layout, restored_mode == "developer")
 			restored_reserve = maxi(quote.net, 0)
@@ -394,7 +474,11 @@ func restore(data: Dictionary, legacy: bool = false) -> bool:
 	var readiness := restored_layout.readiness()
 	if not readiness.ok or data.rooms.size() != readiness.room_count or data.terrace != readiness.terrace:
 		return false
-	if not _valid_state(data, restored_count):
+	if not has_meals:
+		data = data.duplicate(true)
+		if not _migrate_meals(data):
+			return false
+	if not _valid_state(data, restored_count, restored_layout.dining_tables()):
 		return false
 
 	day = data.day
@@ -418,17 +502,52 @@ func restore(data: Dictionary, legacy: bool = false) -> bool:
 	return true
 
 
-func _valid_state(data: Dictionary, bookings: int) -> bool:
+static func prune_migrated_scenery(plan: Layout, active: Layout) -> void:
+	# Old plans could uncover baked scenery by demolishing a building. The
+	# migration must not introduce a paid prop that was absent from the live run.
+	for prop in plan.landscape.props.duplicate():
+		if active.landscape.prop_by_id(prop.id).is_empty():
+			plan.remove_prop(prop.id)
+
+
+func _migrate_meals(data: Dictionary) -> bool:
+	for family in data.families:
+		if not family is Dictionary or family.get("phase") in ["wait_table", "to_table", "eating"]:
+			return false
+		family.table_id = -1
+		family.dining_wait = 0
+		if family.get("phase") == "to_pool" or (family.get("phase") == "service" and family.get("station") == 1):
+			family.legacy_meal = true
+	for review in data.reviews:
+		if not review is Dictionary:
+			return false
+		review.dining_wait = 0
+	return true
+
+
+func _valid_state(data: Dictionary, bookings: int, tables: Array[Dictionary]) -> bool:
 	if data.stopped != (data.day == FINAL_DAY and data.second == DAY_LENGTH):
 		return false
 	if (data.second < OPEN_BOOKINGS) != (data.booked_package == -1):
 		return false
 	if data.families.size() > bookings:
 		return false
+	var table_ids := {}
+	for table in tables:
+		table_ids[table.id] = true
+	var occupied := {}
+	var waiting := false
 	for i in range(data.families.size()):
 		var family: Variant = data.families[i]
-		if not _valid_family(family, i, data.second, data.rooms.size()):
+		if not _valid_family(family, i, data.second, data.rooms.size(), table_ids):
 			return false
+		if family.phase in TABLE_RESERVATION_PHASES:
+			if occupied.has(family.table_id):
+				return false
+			occupied[family.table_id] = true
+		waiting = waiting or family.phase == "wait_table"
+	if waiting and occupied.size() < table_ids.size():
+		return false
 	for i in range(data.rooms.size()):
 		var occupant: Variant = data.rooms[i]
 		if not occupant is int or occupant < -1 or occupant >= data.families.size():
@@ -442,13 +561,13 @@ func _valid_state(data: Dictionary, bookings: int) -> bool:
 			if data.rooms[family.room] != family.id:
 				return false
 	for review in data.reviews:
-		if not _int_fields(review, ["day", "room", "score"]):
+		if not _int_fields(review, ["day", "room", "score", "dining_wait"]):
 			return false
 		if review.day < 1 or review.day > data.day or review.room < 0 or review.room >= 8:
 			return false
 		if review.score < 0 or review.score > 100 or not review.get("note") is String:
 			return false
-		if not _valid_waits(review.get("waits")):
+		if not _valid_waits(review.get("waits")) or review.dining_wait < 0 or review.dining_wait >= DAY_LENGTH:
 			return false
 	for recap in data.day_recaps:
 		if not _int_fields(recap, ["day", "stays", "cash"]):
@@ -463,8 +582,8 @@ func _valid_state(data: Dictionary, bookings: int) -> bool:
 	return true
 
 
-func _valid_family(family: Variant, index: int, at_second: int, room_count: int) -> bool:
-	if not _int_fields(family, ["id", "room", "station", "since", "until", "joined", "slot"]):
+func _valid_family(family: Variant, index: int, at_second: int, room_count: int, table_ids: Dictionary) -> bool:
+	if not _int_fields(family, ["id", "room", "station", "since", "until", "joined", "slot", "table_id", "dining_wait"]):
 		return false
 	if family.id != index or family.room < -1 or family.room >= 8 or family.station not in [0, 1, 2]:
 		return false
@@ -476,6 +595,27 @@ func _valid_family(family: Variant, index: int, at_second: int, room_count: int)
 		return false
 	if family.slot not in [-1, 0, 1, 2] or not _valid_waits(family.get("waits")):
 		return false
+	if family.dining_wait < 0 or family.dining_wait > family.since:
+		return false
+	if family.has("legacy_meal") and (not family.legacy_meal is bool or not family.legacy_meal):
+		return false
+	var legacy_meal: bool = family.has("legacy_meal")
+	var collecting: bool = family.phase == "service" and family.station == 1
+	var duration: int = family.until - family.since
+	if legacy_meal and not (collecting or family.phase == "to_pool"):
+		return false
+	if collecting and (family.since - family.joined != family.waits[1] or duration != (LEGACY_BUFFET_DURATION if legacy_meal else DURATIONS[1])):
+		return false
+	var table_phase: bool = family.phase in TABLE_RESERVATION_PHASES or (family.phase == "to_pool" and not legacy_meal)
+	if table_phase:
+		if not table_ids.has(family.table_id) or family.slot != -1:
+			return false
+		var after_seating: int = {"to_table": 0, "eating": TABLE_WALK_DURATION, "to_pool": TABLE_WALK_DURATION + EAT_DURATION}[family.phase]
+		var collection_duration: int = family.since - after_seating - family.dining_wait - family.joined - family.waits[1]
+		if collection_duration not in [DURATIONS[1], LEGACY_BUFFET_DURATION] or duration != (EAT_DURATION if family.phase == "eating" else TABLE_WALK_DURATION):
+			return false
+	elif family.table_id != -1:
+		return false
 	match family.phase:
 		"queue", "service":
 			if (family.room == -1) != (family.station == 0):
@@ -483,15 +623,22 @@ func _valid_family(family: Variant, index: int, at_second: int, room_count: int)
 		"to_room", "settle", "to_buffet":
 			if family.room < 0 or family.station != 0:
 				return false
-		"to_pool":
+		"wait_table", "to_table", "eating", "to_pool":
 			if family.room < 0 or family.station != 1:
 				return false
 		_:
 			if family.room < 0 or family.station != 2:
 				return false
+	if not table_phase and family.station < 2 and family.dining_wait != 0:
+		return false
+	if family.phase == "wait_table":
+		var collection_duration: int = family.since - family.joined - family.waits[1]
+		return family.until == -1 and family.slot == -1 and collection_duration in [DURATIONS[1], LEGACY_BUFFET_DURATION]
 	if family.phase in ["queue", "rest", "gone"]:
 		return family.until == -1
-	return family.until > at_second and family.until < DAY_LENGTH and family.slot >= 0
+	if legacy_meal and family.phase == "to_pool" and (duration != 4 or family.since - family.joined - family.waits[1] != LEGACY_BUFFET_DURATION):
+		return false
+	return family.until > at_second and family.until < DAY_LENGTH and (family.slot >= 0 or table_phase)
 
 
 func _int_fields(value: Variant, keys: Array) -> bool:
