@@ -1,0 +1,134 @@
+extends SceneTree
+
+const Sim = preload("res://scripts/simulation.gd")
+
+var failures := 0
+
+
+func _initialize() -> void:
+	_check_standard_run()
+	_check_price_changes()
+	_check_staff_transfer()
+	_check_restore()
+	if failures == 0:
+		print("Simulation checks passed")
+	quit(0 if failures == 0 else 1)
+
+
+func _check_standard_run() -> void:
+	var sim := Sim.new()
+	_expect(sim.cash == 140 and sim.selected_package == 1 and sim.float_station == 1, "Opening balances and selections")
+	_expect(sim.rooms == [-1, -1, -1, -1], "Four initially free rooms")
+	_expect(not sim.terrace and sim.capacity(2) == 1, "Pool starts without terrace furnishings")
+	_tick(sim, 140)
+	_expect(sim.cash == 620 and sim.rooms == [0, 1, 2, 3], "Four check-ins at the locked price")
+	_expect(sim.families[3].waits[2] == 34, "34-second peak pool wait")
+	_tick(sim, 97)
+	_expect(sim.rooms == [-1, -1, -1, -1] and sim.families[3].phase == "gone", "All families clear before payroll")
+	_expect(_scores(sim) == [92, 89, 84, 78], "Day 1 rating fixture")
+	_tick(sim, 3)
+	_expect(sim.day == 2 and sim.second == 0 and sim.cash == 500, "Day 1 closing balance")
+	var plan := _terrace_plan(sim)
+	_expect(sim.apply_construction(plan).ok and sim.cash == 400 and sim.capacity(2) == 2, "Day 2 furnishings add pool capacity for $100")
+	_expect(sim.apply_construction(plan).ok and sim.cash == 400, "Existing terrace furnishings are charged only once")
+	_tick(sim, Sim.DAY_LENGTH)
+	_expect(_scores(sim).slice(4) == [100, 100, 100, 100], "Upgraded pool rating fixture")
+	_tick(sim, Sim.DAY_LENGTH)
+	_expect(sim.stopped and sim.cash == 1120 and sim.reviews.size() == 12, "Three-day recap balance and stay count")
+	_expect(is_equal_approx(sim.average(), 95.25) and sim.milestone.terrace, "Three-day recap rating and terrace")
+	_tick(sim, 5)
+	_expect(sim.cash == 1120 and sim.day == 3, "Time stays stopped at recap")
+	sim.continue_after_recap()
+	_expect(sim.day == 4 and sim.second == 0 and sim.milestone.stays == 12, "Day 4 preserves the milestone")
+
+
+func _check_price_changes() -> void:
+	var sim := Sim.new()
+	sim.selected_package = 0
+	_tick(sim, 20)
+	sim.selected_package = 2
+	_tick(sim, 100)
+	_expect(sim.cash == 500 and sim.booked_package == 0, "Today's Budget bookings keep their price")
+	_tick(sim, 120)
+	_expect(sim.cash == 380 and not sim.terrace, "Budget closes with $380 and the original pool")
+	_tick(sim, 28)
+	_expect(sim.cash == 550 and sim.apply_construction(_terrace_plan(sim)).defer and sim.cash == 450, "Pending terrace reserves $100 after the first Premium check-in")
+	_tick(sim, 172)
+	_expect(sim.families.size() == 3 and sim.cash == 790, "Premium has three arrivals and $510 in revenue")
+
+
+func _check_staff_transfer() -> void:
+	var sim := Sim.new()
+	sim.float_station = 2
+	_tick(sim, 170)
+	_expect(sim.families[3].waits[1] == 30, "30-second peak buffet wait")
+	_expect(sim.families.all(func(family: Dictionary) -> bool: return family.waits[2] == 0), "Pool float prevents pool waits")
+
+	sim = Sim.new()
+	_tick(sim, 55)
+	_expect(sim.count_at(1, "service") == 2, "Float enables parallel buffet service")
+	sim.float_station = 0
+	_tick(sim, 7)
+	_expect(sim.count_at(1, "service") == 2 and sim.count_at(1, "queue") == 1, "Reassignment keeps current buffet service")
+	_tick(sim, 10)
+	_expect(sim.count_at(1, "service") == 1 and sim.count_at(1, "queue") == 1, "Future service follows revised capacity")
+	_tick(sim, 165)
+	_expect(sim.rooms == [-1, -1, -1, -1] and sim.families[3].phase == "gone", "Transfer run clears before closing")
+
+
+func _check_restore() -> void:
+	var original := Sim.new()
+	_tick(original, 94)
+	_expect(original.count_at(2, "queue") == 2 and original.count_at(2, "service") == 1, "Checkpoint contains both active service and queue")
+	original.selected_package = 2
+	var restored := Sim.new()
+	var state: Dictionary = bytes_to_var(var_to_bytes(original.snapshot()))
+	_expect(restored.restore(state) and _same_state(restored.snapshot(), original.snapshot()), "Active simulation survives serialization")
+	_tick(original, 146)
+	_tick(restored, 146)
+	_expect(_same_state(restored.snapshot(), original.snapshot()), "Loaded run posts each review and payroll once")
+	var before := restored.snapshot()
+	state.families[0].waits = [false, 0, 0]
+	_expect(not restored.restore(state) and _same_state(restored.snapshot(), before), "Invalid wait records leave current state intact")
+	state = original.snapshot()
+	state.rooms = [-1, "bad", -1, -1]
+	_expect(not restored.restore(state) and _same_state(restored.snapshot(), before), "Invalid room record leaves current state intact")
+	state = original.snapshot()
+	state.reviews[0].score = -5
+	_expect(not restored.restore(state) and _same_state(restored.snapshot(), before), "Invalid review leaves current state intact")
+	var occupied := Sim.new()
+	_tick(occupied, 55)
+	state = occupied.snapshot()
+	state.families[0].station = 0
+	_expect(not restored.restore(state) and _same_state(restored.snapshot(), before), "An occupied room cannot reenter check-in service")
+
+
+func _tick(sim: Sim, seconds: int) -> void:
+	for i in range(seconds):
+		sim.tick()
+
+
+func _scores(sim: Sim) -> Array:
+	return sim.reviews.map(func(review: Dictionary) -> int: return review.score)
+
+
+func _expect(condition: bool, description: String) -> void:
+	if not condition:
+		failures += 1
+		push_error(description)
+
+
+func _terrace_plan(sim: Sim) -> Sim.Layout:
+	var draft: Sim.Layout = sim.layout.duplicate_layout()
+	var pool: Dictionary = draft.buildings.back()
+	draft.add_asset("lounger", pool.id, Vector2i(1, 2))
+	draft.add_asset("lounger", pool.id, Vector2i(16, 2))
+	draft.add_asset("umbrella", pool.id, Vector2i(2, 7))
+	return draft
+
+
+func _same_state(left: Dictionary, right: Dictionary) -> bool:
+	# Object IDs are allocated globally and the allocator can advance during restore.
+	left.layout.erase("next_id")
+	right.layout.erase("next_id")
+	return left == right

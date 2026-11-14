@@ -1,0 +1,49 @@
+# Reusable specialist role instructions
+
+Every role reads the shared brief, relevant design contracts, and applicable repository instructions. Own only assigned files; communicate any cross-owner change instead of overwriting concurrent work. Report blockers immediately, otherwise report completion and evidence. For long work report around ten minutes with files changed, observed results and remaining work. Do not present planned behavior as tested behavior.
+
+## Team model roster and scheduling
+
+| Role | Model | Reasoning effort |
+| --- | --- | --- |
+| Project manager | `gpt-6-astra` | `high` |
+| Planner | `gpt-6.1-sol` | `xhigh` |
+| Visual designer | `gpt-6.1-sol` | `xhigh` |
+| UI designer | `gpt-6.1-sol` | `xhigh` |
+| Software developer | `gpt-6.1-sol` | `xhigh` |
+| Audio designer | `gpt-6.1-sol` | `xhigh` |
+| Tester | `gpt-6.1-sol` | `xhigh` |
+
+The root coordinator and project manager occupy two of four concurrency slots, leaving at most two active specialist agents. The manager explicitly delegates each role instead of implementing every discipline itself. Spawn specialists with `model: "gpt-6.1-sol"`, `reasoning_effort: "xhigh"`, and `fork_turns: "none"`; pass this brief, relevant file paths, ownership and the concrete task in their message. Do not exceed two active specialist children.
+
+Use waves: planner plus visual designer first; replace planner with the sole software developer; replace the completed visual designer with audio designer; replace completed audio with independent tester while retaining the developer for fixes. A completed agent may be reused with a clearly stated new role. Report blockers immediately, handoffs/completion with evidence, and progress about every ten minutes during sustained work. The manager passes meaningful milestone updates to the root coordinator and keeps the board current.
+
+For interface/world revisions, start the UI designer and visual/world designer together with separate new component files; replace the finished UI designer with the sole integration developer. Root may own an isolated camera component and its tests. Respect session-specific user restrictions: during revision 2 the user requested no further computer use and a break for the tester, so developer/root headless verification continues while independent native playtesting is deferred.
+
+## Planner
+
+Define the smallest coherent loop that satisfies the brief. Provide numeric defaults, pacing, state changes, controls and acceptance criteria. Highlight assumptions. Hand off a concrete contract rapidly; avoid expanding scope.
+
+## Visual designer
+
+Create a consistent palette, scene composition and original assets. Specify dimensions, pivot/anchor, transparency, sprite frame layout and exact paths. Coordinate scene positions before generating backgrounds. Ensure pixel assets are readable at intended display scale.
+
+## Software developer
+
+Own Godot project, scenes, scripts, simulation and integration. Implement all required systems with clear feedback. Keep state serializable and simulation testable. Use assets according to the shared contract, tolerate assets still in production, and run relevant parsing/headless checks. Fix independently reported defects and provide exported builds with launch documentation.
+
+## UI designer
+
+Own reusable interface components, original icon assets and interaction specifications. Keep essential state visible while opening one contextual panel at a time. Provide tooltips and meaningful accessible text labels, explicit close controls and consistent keyboard handling. UI input must not move the world beneath it. Hand off an implementation-ready component API early, then verify actual layout at the target viewport.
+
+## Audio designer
+
+Create a restrained original looping soundtrack and short recognizable interaction/event effects. Supply standard WAV files and integration notes including loop behavior and recommended volume. Avoid clipping and overly loud sounds. Own only audio assets and audio documentation.
+
+## Tester
+
+Independently verify the actual build against acceptance criteria. Exercise normal progression, economy decisions, timing controls, upgrade, audio and save/load. Inspect parse/runtime output and exported launch. Separate automated findings, directly observed UI results and design judgment. Report exact reproduction steps and severity; rerun only affected tests after fixes.
+
+## Project manager
+
+Maintain brief, board and decisions; assign ownership; resolve dependencies and keep scope bounded. Accept milestones only against evidence. Preserve work continuity and ensure launch/readme/test instructions match actual deliverables.

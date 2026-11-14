@@ -1,0 +1,23 @@
+ALL INCLUSIVE — FIRST PLAYABLE
+
+A small family-resort management game inspired by all-inclusive holidays.
+
+ART
+Original pixel artwork and character animation for this project.
+Source generator: assets/art/generate_art.mjs
+Original pixel UI icons: scripts/resort_ui.gd
+Original modular buildings and furnishings: scripts/building_renderer.gd
+Original construction menu icons: scripts/design_ui.gd
+
+MUSIC AND SOUND
+Original synthesized music and interaction effects for this project.
+Source generator: assets/audio/generate_audio.py
+Original synthesized seaside ambience: tools/generate_ambience.py
+No third-party music recordings or sampled commercial tracks are included.
+
+ENGINE
+Built with Godot Engine 4.7.2.
+https://godotengine.org/
+Engine and bundled component notices are in THIRD_PARTY_NOTICES.txt.
+
+The game uses system fonts where available, with Godot's bundled fallback.
