@@ -28,6 +28,8 @@ For revision 6, the two specialist slots are the simulation/layout/core develope
 
 For revision 7's autonomous expansion, retain the same roster with a model/UI/core developer and beach visual/map specialist. Root owns official-source research, a separate beach-contract test, packaging and Git. Target a coherent tested subset within the user's hour: four functional editable amenities, compatibility and artifact verification before optional polish. No computer use or native tester resumption.
 
+For revision 8's focused consistency fix, use one Sol/xhigh UI/core integrator under the Astra/high PM. Root owns an independent construction-consistency test and packaging. Reproduce the category-gated bug before changing controls, then test actual routed selection, purchases, removal and occupied-hotel staging. Do not recruit a second specialist or resume the native tester without a concrete need and authorization.
+
 ## Planner
 
 Define the smallest coherent loop that satisfies the brief. Provide numeric defaults, pacing, state changes, controls and acceptance criteria. Highlight assumptions. Hand off a concrete contract rapidly; avoid expanding scope.

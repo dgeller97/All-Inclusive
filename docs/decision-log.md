@@ -52,5 +52,8 @@
 | Give completed distinct leisure activities a capped +3 satisfaction benefit | Buying amenities in preserved old layouts has an observable guest benefit without changing package prices or adding a separate revenue system |
 | Relocate starter lounge/stage, rotate the court and adjust Home framing after CPU inspection | Reduces palm occlusion, makes the net readable and keeps amenities above the HUD while preserving original scenery and saved cameras |
 | Accept R7 after independent per-kind save checkpoints, routed editing, visual and standalone package checks | Four functioning editable amenities form a coherent stopping point within the autonomous work window; source is handed to root for the authorized push |
+| R8 makes catalog choice independent of Select/Bulldoze/Move targets | The existing category gate made functional purchased/removable facilities appear unsupported in the default Buildings view |
+| Expose Facilities directly with visible Regular prices or Developer Free labels | Purchase capability should be discoverable without navigating a nested landscape tab or relying on hover tooltips |
+| Accept R8 after universal-tool, routed-price, staged-removal and portable-package checks | The independent suite reproduces the original defect and passes 137 checks after the fix; 610 routed/geometry checks, targeted regressions and the matching archived executable support local acceptance without claiming native playtesting |
 
 Further implementation decisions will be recorded after design handoff and test evidence.

@@ -2,7 +2,7 @@
 
 ## Current revision
 
-Revision 7 adds functional editable dry-beach relaxation, volleyball, a beach bar and evening stage entertainment. Use `revision-7.md` for the current model/pose contract and `resort-research.md` for official-source design context. Revision 6's actual buffet/table meal loop and revision 5's exterior view, names and finishes remain. The user-selected fixed coast is authoritative; no ocean swimming or coast painting is introduced. Earlier construction, Regular/Developer costs, staged layout application and the compact management loop remain in place.
+Revision 8 makes construction controls consistent: a top-level Facilities catalog with visible prices/Free, universal object selection/bulldozing, and Move for selected outdoor assets regardless of the catalog. Use `revision-8.md` for this focused UI contract. R7's functional beach amenities, R6's actual restaurant meal loop and R5's appearance features remain. The fixed coast, Regular/Developer transactions, saved layouts and staged Apply Tomorrow workflow are preserved.
 
 ## Outcome
 

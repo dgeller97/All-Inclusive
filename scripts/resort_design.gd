@@ -73,12 +73,13 @@ func choose(action: String, value: Variant) -> void:
 		"category":
 			if value != category:
 				category = value
-				selection = {}
-				tool = "select"
+				if tool not in ["select", "bulldoze", "move"]:
+					tool = "select"
 				if category == "landscape":
 					landscape_group = "terrain"
-					brush_value = "grass"
-					tool = "terrain"
+					if tool == "select" and selection.is_empty():
+						brush_value = "grass"
+						tool = "terrain"
 		"landscape_group":
 			landscape_group = value
 			selection = {}
@@ -89,7 +90,7 @@ func choose(action: String, value: Variant) -> void:
 				"path":
 					tool = "path"
 					brush_value = "stone"
-				"scenery", "amenities":
+				"scenery":
 					tool = "select"
 		"tool":
 			tool = "select"
@@ -116,7 +117,7 @@ func choose(action: String, value: Variant) -> void:
 				asset_rotation = 0
 			prop_kind = value
 		"move":
-			if _prop_selected():
+			if can_move():
 				tool = "move"
 				asset_rotation = selection.rotation
 	_update_ghost()
@@ -151,7 +152,7 @@ func can_rotate() -> bool:
 
 
 func can_move() -> bool:
-	return category == "landscape" and _prop_selected() and tool in ["select", "move"]
+	return _prop_selected()
 
 
 func selected_tool() -> String:
@@ -221,26 +222,8 @@ func press(point: Vector2) -> bool:
 				_report(result, "%s placed." % Landscape.PROP_CATALOG[prop_kind].label)
 			_update_ghost()
 			return result.ok
-		_:
-			if category == "landscape":
-				return _scenery_click(point)
-			var furnishing := draft.asset_at(point)
-			var target := furnishing if not furnishing.is_empty() else draft.building_at(point)
-			if tool == "select":
-				if target.get("id", -1) != settings_building_id:
-					close_building_settings()
-				selection = target
-				queue_redraw()
-			elif target.is_empty():
-				feedback = "Click a furnishing or a building to bulldoze it."
-				feedback_valid = false
-			else:
-				var object_name := _object_name(target)
-				var result := draft.remove_asset(target.id) if target.has("cell") else draft.remove_building(target.id)
-				selection = {}
-				_report(result, "%s removed." % object_name)
-				queue_redraw()
-				return result.ok
+		"select", "bulldoze":
+			return _edit_object_at(point)
 	return false
 
 
@@ -274,8 +257,6 @@ func selection_text() -> String:
 	if selection.is_empty():
 		return ""
 	var item := _object_name(selection)
-	if _prop_selected():
-		return "%s · %d°" % [item, selection.rotation * 90]
 	if selection.has("cell"):
 		return "%s · %d°" % [item, selection.rotation * 90]
 	var bounds := draft.building_rect(selection)
@@ -283,7 +264,7 @@ func selection_text() -> String:
 
 
 func selected_building() -> Dictionary:
-	if tool == "select" and category != "landscape" and selection.has("rect"):
+	if tool == "select" and selection.has("rect"):
 		return selection
 	return {}
 
@@ -371,25 +352,34 @@ func _prop_selected() -> bool:
 	return selection.has("offset")
 
 
-func _scenery_at(point: Vector2) -> Dictionary:
-	return draft.prop_at(point) if draft.building_at(point).is_empty() else {}
-
-
-func _scenery_click(point: Vector2) -> bool:
-	var target := _scenery_at(point)
+func _edit_object_at(point: Vector2) -> bool:
+	var target := draft.asset_at(point)
+	if target.is_empty():
+		# A building's footprint takes priority over overhanging scenery.
+		target = draft.building_at(point)
+	if target.is_empty():
+		target = draft.prop_at(point)
 	if tool == "select":
+		if not target.has("rect") or target.id != settings_building_id:
+			close_building_settings()
 		selection = target
 		queue_redraw()
-	elif target.is_empty():
-		feedback = "Click an outdoor object to bulldoze it."
+		return false
+	if target.is_empty():
+		feedback = "Click a building, furnishing, or outdoor object to remove it."
 		feedback_valid = false
+		return false
+	var result: Dictionary
+	if target.has("offset"):
+		result = draft.remove_prop(target.id)
+	elif target.has("cell"):
+		result = draft.remove_asset(target.id)
 	else:
-		var result := draft.remove_prop(target.id)
-		selection = {}
-		_report(result, "%s removed." % _object_name(target))
-		queue_redraw()
-		return result.ok
-	return false
+		result = draft.remove_building(target.id)
+	selection = {}
+	_report(result, "%s removed." % _object_name(target))
+	queue_redraw()
+	return result.ok
 
 
 func _asset_cell(target: Dictionary) -> Vector2i:

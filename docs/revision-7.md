@@ -1,5 +1,7 @@
 # Revision 7: beach leisure and entertainment
 
+The gameplay and model contract below remains current. Revision 8 supersedes only the editor navigation: use top-level **Build → Facilities**, with universal Select/Bulldoze/Move, instead of the original nested Amenities group. See `revision-8.md`.
+
 ## Scope and timing
 
 The user requested autonomous expansion after pushing the prior version. Root confirmed that push before this work. This iteration adds four functional, editable outdoor amenities informed by the official resort examples in `resort-research.md`: shaded beach relaxation, volleyball, a beach bar and evening stage entertainment. Target scope freeze is 06:05 UTC and a tested local package by approximately 06:20 UTC on 14 November 2026.

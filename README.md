@@ -8,7 +8,7 @@ A compact resort-management game. Welcome families, set package prices, balance 
 
 [Download the latest Windows build](https://github.com/dgeller97/All-Inclusive/releases/latest/download/AllInclusive-Windows.zip), extract the ZIP, and double-click `AllInclusive.exe`. No Godot installation is required. [Release notes and checksums](https://github.com/dgeller97/All-Inclusive/releases/latest) are available on GitHub. Use the Windows ZIP asset, not GitHub's automatically generated source-code archives.
 
-The current local development build is Revision 7, with usable beach amenities, volleyball, beach bars and outdoor entertainment, alongside restaurant interactions, building customization and landscape editing. The published GitHub release remains v0.3.0 until a new release is uploaded.
+The current local development build is Revision 8, with a direct Facilities catalog and consistent selection/bulldozing across all construction categories, alongside usable beach amenities, restaurant interactions and landscape editing. The published GitHub release remains v0.3.0 until a new release is uploaded.
 
 Extract `build/AllInclusive-Windows.zip` and open `AllInclusive.exe`. From the project folder, you can also open `build/windows/AllInclusive.exe` directly. The game runs on 64-bit Windows and includes its assets.
 
@@ -31,7 +31,7 @@ Windows stores the save and audio preference under `%APPDATA%\Godot\app_userdata
 
 New games include a small starter leisure area. After their pool visit, families can relax at beach loungers or play volleyball, then stop for an included drink. Later in the day, guests can watch a performance at the outdoor stage. Venues use the furniture you actually place, with reachable access and limited capacity. Full or unreachable optional venues are skipped so families can still finish their holiday.
 
-Open **Build → Landscape → Amenities** to add venues, then Select to move or rotate them and Bulldoze to remove them. Regular construction costs are $40 for a beach lounge, $100 for a volleyball court, $100 for a beach bar and $120 for a stage. Developer construction is free. Starter amenities have no demolition refund; purchased amenities use the usual half-cost refund. You can place additional bars or activities around the resort.
+Open **Build → Facilities** to buy and place venues. The catalog shows their prices, or **Free** in Developer mode. Regular construction costs are $40 for a beach lounge, $100 for a volleyball court, $100 for a beach bar and $120 for a stage. Use **Select → Move** to relocate a facility, R to rotate while placing or moving, and **Bulldoze** to remove it. These tools work regardless of which construction category is open. Starter amenities can be removed but have no demolition refund; purchased amenities use the usual half-cost refund. You can place additional bars or activities around the resort.
 
 Each distinct activity a family completes adds one satisfaction point, capped at three per stay. Reviews show the activity bonus. Guest activities are included in the package, with no extra per-drink charge. Reservations and activity progress save with the run. Existing saves keep their layouts and can add the new venues through Build.
 
@@ -57,7 +57,7 @@ Switch to **Show interiors** to watch guests collecting, carrying and eating the
 
 Start a **Regular resort** to pay construction costs, or choose **Developer · Free build** to experiment without spending money. The mode is saved with the run. A regular pool improvement costs $100 in furnishings (two $30 loungers and a $40 umbrella); starter hotel assets have no demolition refund. Newly purchased assets refund half their paid cost when removed.
 
-Build mode pauses the clock and edits a draft. Choose a building and drag a rectangle on the land; choose a furnishing and click inside its matching building. Press R to rotate furnishings. Use Select to inspect objects and Bulldoze to remove them. Bulldoze prioritizes furniture; click empty floor to remove a whole building and its contents. Moving buildings or indoor furniture currently requires bulldozing and rebuilding them. Middle-button drag and the mouse wheel still pan and zoom. Right click or Esc cancels the current tool.
+Build mode pauses the clock and edits a draft. Choose a building and drag a rectangle on the land; choose a furnishing and click inside its matching building. Press R to rotate furnishings. Select and Bulldoze recognize buildings, furniture, facilities and scenery from every category. Bulldoze prioritizes furniture inside a building; click empty floor to remove a whole building and its contents. Moving buildings or indoor furniture currently requires bulldozing and rebuilding them. Middle-button drag and the mouse wheel still pan and zoom. Right click or Esc cancels the current tool.
 
 Rooms need accessible beds, reception needs a desk, and the buffet needs a counter and dining table. Keep doorways open and buildings clear of the ocean. Apply an operational layout immediately when no families are staying, or queue it for tomorrow while guests finish their holiday. Save draft preserves unfinished work. Discard returns to the hotel and drops edits made since the last draft save; a saved draft remains available from Build. Queued construction reserves its cost, and canceling the queued plan returns the reserved amount.
 
@@ -108,6 +108,8 @@ $godot = ".\.tools\godot\Godot_v4.7.2-stable_win64_console.exe"
 & $godot --headless --path . --script res://tests/building_renderer_test.gd
 & $godot --headless --path . --script res://tests/dining_contract_test.gd
 & $godot --headless --path . --script res://tests/beach_contract_test.gd
+& $godot --headless --path . --script res://tests/construction_consistency_test.gd
+& $godot --headless --path . --script res://tests/facilities_scene_test.gd
 & $godot --headless --path . --script res://tests/construction_transactions_test.gd
 & $godot --headless --path . --script res://tests/landscape_model_test.gd
 & $godot --headless --path . -- --smoke-test
@@ -126,4 +128,4 @@ The design and production notes are in `docs/`.
 
 The starter resort has four bedrooms and three service areas. You can build up to eight bedrooms and one reception, buffet, and pool. Bookings remain capped at four families per day (three on Premium), limited by the number of usable bedrooms. Families follow a repeating daily schedule and swim in the resort pool. Pricing and staffing affect revenue and reviews. Plants and benches are decorative; multiple floors, multiple copies of service buildings, and a larger progression system are deferred.
 
-See `docs/revision-7.md` for beach amenities, `docs/revision-6.md` for restaurant interactions, `docs/revision-5.md` for building appearance, `docs/revision-4.md` for landscape editing and `docs/revision-3.md` for the underlying construction system. Current validation uses headless checks; interactive desktop playtesting is paused at the user's request. The native Windows playthrough in `docs/native-playtest.md` covers the original first playable release only.
+See `docs/revision-8.md` for consistent construction controls, `docs/revision-7.md` for beach amenities, `docs/revision-6.md` for restaurant interactions, `docs/revision-5.md` for building appearance, `docs/revision-4.md` for landscape editing and `docs/revision-3.md` for the underlying construction system. Current validation uses headless checks; interactive desktop playtesting is paused at the user's request. The native Windows playthrough in `docs/native-playtest.md` covers the original first playable release only.

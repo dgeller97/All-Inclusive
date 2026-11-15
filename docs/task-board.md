@@ -1,6 +1,17 @@
 # Task board
 
-## Delivered revision 7
+## Delivered revision 8
+
+| Task | Owner | State | Contract / evidence |
+| --- | --- | --- | --- |
+| Reproduce category-gated selection/removal | Root + integrator | Complete | Four starter facilities ignored in Buildings; independent baseline 76 checks/39 failures |
+| Visible Facilities catalog and universal tools | UI/core integrator | Complete | Top-level category, visible prices/Free across object catalogs, object-based Select/Bulldoze/Move/settings |
+| Independent consistency and routed UI checks | Root + integrator | Complete | Independent 137 and routed 610 including geometry; paid/free transactions, saved draft, occupied bar queue/reload/Day 2 removal |
+| Local Windows package | Integrator + root | Complete | Source/portable smoke and matching archived executable; no model/simulation/schema change |
+
+Current package: `build/AllInclusive-Windows.zip`, 41,302,336 bytes, SHA-256 `28EC2E5CF5CAF90028081FB717C77CF05CF7327A5A84DBAF6E2FDD7D7ADCAF8D`. Executable: 111,390,616 bytes, SHA-256 `D0E9742C8AA834279DAF374D99EC31AFBC613E9C120FA4AF19906EE74DB08624`. See `revision-8.md` and `revision-8-validation.md`. Integrator finished; production frozen. No native playtesting or new GitHub release.
+
+## Earlier revision 7 (superseded artifact)
 
 | Task | Owner | State | Contract / evidence |
 | --- | --- | --- | --- |
@@ -9,7 +20,7 @@
 | Pixel amenity art and guest interaction | Beach visual specialist | Complete | Visual121; accepted actual-phase CPU preview, readable parasol/net/bar/stage |
 | Independent tests, regressions and package | Root + specialists + PM | Complete | Management73+9, legacy/current saves, full regression roster, standalone smoke and archived executable hash verified |
 
-Current package: `build/AllInclusive-Windows.zip`, 41,301,812 bytes, SHA-256 `66199887A1FC43EAD15C01C768348359DFAA16F1BF4C55A1E6DEEC51EB8A2EE5`. Executable: 111,390,200 bytes, SHA-256 `A15CDA2AC965BE162DFF726759F95797D05A67F598C96DF1AE72612613E6ACCE`. See `revision-7.md` and `revision-7-validation.md`. Specialists finished, production frozen, source ready for root's authorized commit/push. No native playtesting or new GitHub release.
+Historical package: 41,301,812 bytes, SHA-256 `66199887A1FC43EAD15C01C768348359DFAA16F1BF4C55A1E6DEEC51EB8A2EE5`. Executable: 111,390,200 bytes, SHA-256 `A15CDA2AC965BE162DFF726759F95797D05A67F598C96DF1AE72612613E6ACCE`. See `revision-7.md` and `revision-7-validation.md`. Backed up under `.tools/releases/AllInclusive-r7-beach-Windows.zip`; R8 supersedes this local artifact. No native playtesting or new GitHub release.
 
 ## Earlier revision 6 (superseded artifact)
 

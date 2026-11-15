@@ -47,16 +47,12 @@ func _test_build_and_use() -> void:
 	_check(game.ui._body.amenities.stage.text == "0 / 4 families", "Leisure panel shows real stage capacity")
 	game.ui.close_panel()
 	_click(game.ui._dock_buttons.design.get_global_rect().get_center())
-	_click(game.design_ui._category_buttons.landscape.get_global_rect().get_center())
-	_click(game.design_ui._landscape_buttons.amenities.get_global_rect().get_center())
+	_click(game.design_ui._category_buttons.facilities.get_global_rect().get_center())
 	for kind in Sim.LEISURE_DURATIONS:
 		var button: Button = game.design_ui._tool_buttons[kind]
-		_check(button.visible and "$" in button.tooltip_text and "families" in button.tooltip_text,
+		var price: Label = button.get_node("Price")
+		_check(button.visible and price.visible and "$" in price.text and "families" in button.tooltip_text,
 			"%s has a visible build tool, cost and capacity" % kind)
-	var last_group: Button = game.design_ui._landscape_buttons.amenities
-	for child in game.design_ui._palette.get_children():
-		if child is Label and "Middle-drag" in child.text:
-			_check(not last_group.get_global_rect().intersects(child.get_global_rect()), "Landscape tabs and camera controls hint fit side by side")
 	var bar: Dictionary = sim.layout.amenities("beach_bar")[0]
 	_click(game.camera.world_to_screen(bar.rect.get_center()))
 	_check(game.design.selection.get("id") == bar.id and not game.design_ui._move.disabled, "Amenities can be selected and moved in Build")
