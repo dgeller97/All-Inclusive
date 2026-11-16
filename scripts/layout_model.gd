@@ -1,13 +1,13 @@
 extends RefCounted
 ## Serializable construction geometry. Money is committed by the main controller.
 
-const GRID := 8
-const WORLD_BOUNDS := Rect2(-160, -120, 960, 600)
+const Landscape := preload("res://scripts/landscape_model.gd")
+const GRID := Landscape.GRID
+const WORLD_BOUNDS := Landscape.WORLD_BOUNDS
 const ENTRY := Vector2(60, 276)
 const SHORE := preload("res://assets/art/resort_shore.png")
-const Landscape = preload("res://scripts/landscape_model.gd")
 const MAX_BUILDING_NAME_LENGTH := 24
-const DEFAULT_FINISHES := {"floor": "default", "wall": "default", "ceiling": "default"}
+const DEFAULT_FINISHES := {"floor": "default", "wall": "default", "ceiling": "default", "facade": "default", "roof": "default"}
 const FINISH_CATALOG := {
 	"floor": {
 		"default": {"label": "Original", "cost": 12}, "tile": {"label": "Tile", "cost": 12},
@@ -20,6 +20,14 @@ const FINISH_CATALOG := {
 	"ceiling": {
 		"default": {"label": "Original", "cost": 8}, "plaster": {"label": "Plaster", "cost": 8},
 		"beams": {"label": "Beams", "cost": 8}, "panels": {"label": "Panels", "cost": 8},
+	},
+	"facade": {
+		"default": {"label": "Original", "cost": 16}, "plaster": {"label": "Plaster", "cost": 16},
+		"brick": {"label": "Brick", "cost": 16}, "timber": {"label": "Timber", "cost": 16},
+	},
+	"roof": {
+		"default": {"label": "Original", "cost": 20}, "terracotta": {"label": "Terracotta", "cost": 20},
+		"slate": {"label": "Slate", "cost": 20}, "metal": {"label": "Metal", "cost": 20},
 	},
 }
 const BUILDING_CATALOG := {
@@ -60,6 +68,8 @@ var _dining_cache: Array[Dictionary] = []
 var _dining_cached := false
 var _amenities_cache: Array[Dictionary] = []
 var _amenities_cached := false
+var _ocean_access := {}
+var _ocean_access_cached := false
 
 
 func _init(with_starter_amenities: bool = true) -> void:
@@ -85,7 +95,7 @@ func _init(with_starter_amenities: bool = true) -> void:
 
 
 func snapshot() -> Dictionary:
-	return {"version": 3, "buildings": buildings.duplicate(true), "assets": assets.duplicate(true), "next_id": _next_id, "landscape": landscape.snapshot()}
+	return {"version": 4, "buildings": buildings.duplicate(true), "assets": assets.duplicate(true), "next_id": _next_id, "landscape": landscape.snapshot()}
 
 
 func duplicate_layout() -> RefCounted:
@@ -96,7 +106,7 @@ func duplicate_layout() -> RefCounted:
 
 func restore(data: Dictionary) -> bool:
 	var version: Variant = data.get("version", 1)
-	if not (version is int or version is float) or not is_finite(float(version)) or float(version) != int(version) or int(version) not in [1, 2, 3]:
+	if not (version is int or version is float) or not is_finite(float(version)) or float(version) != int(version) or int(version) not in [1, 2, 3, 4]:
 		return false
 	if not data.get("buildings") is Array or not data.get("assets") is Array:
 		return false
@@ -105,6 +115,7 @@ func restore(data: Dictionary) -> bool:
 	var old_buildings := buildings.duplicate(true)
 	var old_assets := assets.duplicate(true)
 	var old_landscape := landscape
+	var old_next_id := _next_id
 	var restored_landscape := Landscape.new()
 	var legacy := not data.has("landscape")
 	if not legacy and (not data.landscape is Dictionary or not restored_landscape.restore(data.landscape)):
@@ -121,13 +132,17 @@ func restore(data: Dictionary) -> bool:
 			valid = false
 			break
 		var r: Array = entity.rect
-		var result := add_building(str(entity.get("kind", "")), Rect2(r[0], r[1], r[2], r[3]))
+		var rotation: Variant = entity.get("rotation", 0 if int(version) < 4 else null)
+		if not _valid_rotation(rotation):
+			valid = false
+			break
+		var result := add_building(str(entity.get("kind", "")), Rect2(r[0], r[1], r[2], r[3]), int(rotation), false)
 		if not result.ok or not _valid_paid(entity.get("paid_cost", 0)):
 			valid = false
 			break
 		buildings[-1].id = int(entity.id)
 		buildings[-1].paid_cost = int(entity.get("paid_cost", 0))
-		if int(version) == 3 and (not entity.has("display_name") or not entity.has("finishes")):
+		if int(version) >= 3 and (not entity.has("display_name") or not entity.has("finishes")):
 			valid = false
 			break
 		if entity.has("display_name"):
@@ -135,11 +150,15 @@ func restore(data: Dictionary) -> bool:
 				valid = false
 				break
 		if entity.has("finishes"):
-			if not entity.finishes is Dictionary or entity.finishes.size() != 3:
+			if not entity.finishes is Dictionary:
 				valid = false
 				break
-			for surface in DEFAULT_FINISHES:
-				if not entity.finishes.get(surface) is String or not set_building_finish(int(entity.id), surface, entity.finishes[surface]).ok:
+			var surfaces := DEFAULT_FINISHES.keys() if int(version) >= 4 or entity.finishes.size() == DEFAULT_FINISHES.size() else ["floor", "wall", "ceiling"]
+			if entity.finishes.size() != surfaces.size():
+				valid = false
+				break
+			for surface in surfaces:
+				if not entity.finishes.get(surface) is String or not _set_finish(buildings[-1], surface, entity.finishes[surface]):
 					valid = false
 					break
 			if not valid:
@@ -162,7 +181,7 @@ func restore(data: Dictionary) -> bool:
 			if cell[0] != int(cell[0]) or cell[1] != int(cell[1]):
 				valid = false
 				break
-			var result := add_asset(str(entity.get("kind", "")), int(entity.building_id), Vector2i(cell[0], cell[1]), int(rotation))
+			var result := add_asset(str(entity.get("kind", "")), int(entity.building_id), Vector2i(cell[0], cell[1]), int(rotation), false)
 			if not result.ok:
 				valid = false
 				break
@@ -170,6 +189,14 @@ func restore(data: Dictionary) -> bool:
 			assets[-1].paid_cost = int(entity.get("paid_cost", 0))
 			ids[int(entity.id)] = true
 			_next_id = maxi(_next_id, int(entity.id) + 1)
+	if valid and int(version) >= 4:
+		for building in buildings:
+			for member in building_unit(building.id):
+				if member.finishes.facade != building.finishes.facade or member.finishes.roof != building.finishes.roof:
+					valid = false
+					break
+			if not valid:
+				break
 	if valid:
 		if legacy:
 			_install_default_props(restored_props)
@@ -196,12 +223,16 @@ func restore(data: Dictionary) -> bool:
 		buildings.assign(old_buildings)
 		assets.assign(old_assets)
 		landscape = old_landscape
+		_next_id = old_next_id
 	_invalidate()
 	return valid
 
 
 func _valid_id(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value)) and float(value) == int(value) and value > 0 and value < 1000000000
+
+func _valid_rotation(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value)) and float(value) == int(value) and value >= 0 and value <= 3
 
 
 func _valid_paid(value: Variant) -> bool:
@@ -232,6 +263,8 @@ func _invalidate() -> void:
 	_dining_cached = false
 	_amenities_cache.clear()
 	_amenities_cached = false
+	_ocean_access.clear()
+	_ocean_access_cached = false
 
 
 func building_rect(building: Dictionary) -> Rect2:
@@ -286,34 +319,69 @@ func set_building_finish(id: int, surface: String, choice: String) -> Dictionary
 	var building := building_by_id(id)
 	if building.is_empty():
 		return _fail("Select a building to customize it.")
-	if not FINISH_CATALOG.has(surface) or not FINISH_CATALOG[surface].has(choice):
-		return _fail("Choose a valid floor, wall or ceiling finish.")
 	if building.kind == "pool" and choice != "default":
 		return _fail("The pool is outdoors; enclosed-building finishes do not apply.")
-	if not building.has("finishes"):
-		building.finishes = DEFAULT_FINISHES.duplicate()
-	building.finishes[surface] = choice
+	if not _set_finish(building, surface, choice):
+		return _fail("Choose a valid finish.")
+	if surface in ["facade", "roof"]:
+		for member in building_unit(id):
+			_set_finish(member, surface, choice)
 	return {"ok": true, "reason": "", "id": id}
 
 
+func _set_finish(building: Dictionary, surface: String, choice: String) -> bool:
+	if not FINISH_CATALOG.has(surface) or not FINISH_CATALOG[surface].has(choice):
+		return false
+	if building.kind == "pool" and choice != "default":
+		return false
+	building.finishes[surface] = choice
+	return true
+
+
+func _rotate_rect(rect: Rect2, size: Vector2) -> Rect2:
+	return Rect2(size.y - rect.end.y, rect.position.x, rect.size.y, rect.size.x)
+
+
+func _building_feature(building: Dictionary, local: Rect2) -> Rect2:
+	var bounds := building_rect(building)
+	var rotation: int = building.get("rotation", 0)
+	var size := _unrotated_size(building)
+	for turn in range(rotation):
+		local = _rotate_rect(local, size)
+		size = Vector2(size.y, size.x)
+	local.position += bounds.position
+	return local
+
+
+func _unrotated_size(building: Dictionary) -> Vector2:
+	var size := building_rect(building).size
+	return Vector2(size.y, size.x) if int(building.get("rotation", 0)) % 2 else size
+
+
+func door_side(building: Dictionary) -> Vector2:
+	return [Vector2.DOWN, Vector2.LEFT, Vector2.UP, Vector2.RIGHT][building.get("rotation", 0)]
+
+
 func door_point(building: Dictionary) -> Vector2:
-	var r := building_rect(building)
-	return r.position + Vector2((floor(r.size.x / GRID / 2.0) + 0.5) * GRID, r.size.y - GRID / 2.0)
+	var size := _unrotated_size(building)
+	var cell := Rect2(floor(size.x / GRID / 2.0) * GRID, size.y - GRID, GRID, GRID)
+	return _building_feature(building, cell).get_center()
 
 
 func water_rect(building: Dictionary) -> Rect2:
-	var r := building_rect(building)
-	return Rect2(r.position + Vector2(24, 16), r.size - Vector2(48, 40))
+	return _building_feature(building, Rect2(Vector2(24, 16), _unrotated_size(building) - Vector2(48, 40)))
 
 
 func _dry(rect: Rect2) -> bool:
 	return landscape.rect_is_dry(rect)
 
 
-func validate_building(kind: String, rect: Rect2) -> Dictionary:
+func validate_building(kind: String, rect: Rect2, rotation: int = 0, join_rooms: bool = true) -> Dictionary:
 	if not BUILDING_CATALOG.has(kind):
 		return _fail("Choose a building type.")
 	var minimum: Array = BUILDING_CATALOG[kind].min_size
+	if rotation % 2:
+		minimum = [minimum[1], minimum[0]]
 	if rect.size.x < minimum[0] * GRID or rect.size.y < minimum[1] * GRID:
 		return _fail("Too small: minimum %d × %d tiles." % [minimum[0], minimum[1]])
 	for value in [rect.position.x, rect.position.y, rect.size.x, rect.size.y]:
@@ -334,18 +402,207 @@ func validate_building(kind: String, rect: Rect2) -> Dictionary:
 			return _fail("Buildings cannot overlap.")
 	if count >= (8 if kind == "bedroom" else 1):
 		return _fail("This prototype supports eight bedrooms and one of each facility.")
+	if join_rooms:
+		var candidate := {"id": -1, "kind": kind, "rect": _rect_data(rect)}
+		for neighbor in buildings:
+			if not _shared_wall(candidate, neighbor).is_empty() and _shared_passage(candidate, neighbor).is_empty():
+				return _fail("Leave room for a doorway along the shared wall.")
 	return {"ok": true, "reason": "", "id": -1}
 
 
-func add_building(kind: String, rect: Rect2) -> Dictionary:
-	var result := validate_building(kind, rect)
+func add_building(kind: String, rect: Rect2, rotation: int = 0, join_rooms: bool = true) -> Dictionary:
+	rotation = posmod(rotation, 4)
+	var result := validate_building(kind, rect, rotation, join_rooms)
 	if not result.ok:
 		return result
 	var id := _next_id
+	var building := {"id": id, "kind": kind, "rect": _rect_data(rect), "rotation": rotation,
+		"paid_cost": 0, "display_name": _default_building_name(kind), "finishes": DEFAULT_FINISHES.duplicate()}
 	_next_id += 1
-	buildings.append({"id": id, "kind": kind, "rect": [int(rect.position.x), int(rect.position.y), int(rect.size.x), int(rect.size.y)], "paid_cost": 0, "display_name": _default_building_name(kind), "finishes": DEFAULT_FINISHES.duplicate()})
+	buildings.append(building)
+	if join_rooms:
+		_normalize_exterior(id)
 	_invalidate()
 	return {"ok": true, "reason": "", "id": id}
+
+
+func _rect_data(rect: Rect2) -> Array:
+	return [int(rect.position.x), int(rect.position.y), int(rect.size.x), int(rect.size.y)]
+
+
+func building_unit(id: int) -> Array[Dictionary]:
+	var building := building_by_id(id)
+	var unit: Array[Dictionary] = []
+	if building.is_empty():
+		return unit
+	unit.append(building)
+	var included := {id: true}
+	var index := 0
+	while index < unit.size():
+		for neighbor in buildings:
+			if not included.has(neighbor.id) and not _shared_passage(unit[index], neighbor).is_empty():
+				included[neighbor.id] = true
+				unit.append(neighbor)
+		index += 1
+	unit.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.id < b.id)
+	return unit
+
+
+func _normalize_exterior(id: int) -> void:
+	var unit := building_unit(id)
+	for surface in ["facade", "roof"]:
+		var finish: String = unit[0].finishes[surface]
+		for member in unit:
+			member.finishes[surface] = finish
+
+
+func _shared_wall(a: Dictionary, b: Dictionary) -> Dictionary:
+	if a.kind == "pool" or b.kind == "pool":
+		return {}
+	var first := building_rect(a)
+	var second := building_rect(b)
+	if first.end.x == second.position.x or first.position.x == second.end.x:
+		var start := maxf(first.position.y, second.position.y)
+		var end := minf(first.end.y, second.end.y)
+		if end - start >= 2 * GRID:
+			var side := Vector2.RIGHT if first.end.x == second.position.x else Vector2.LEFT
+			return {"side": side, "start": start, "end": end, "edge": first.end.x if side.x > 0 else first.position.x}
+	if first.end.y == second.position.y or first.position.y == second.end.y:
+		var start := maxf(first.position.x, second.position.x)
+		var end := minf(first.end.x, second.end.x)
+		if end - start >= 2 * GRID:
+			var side := Vector2.DOWN if first.end.y == second.position.y else Vector2.UP
+			return {"side": side, "start": start, "end": end, "edge": first.end.y if side.y > 0 else first.position.y}
+	return {}
+
+
+func _shared_passage(a: Dictionary, b: Dictionary, extra := Rect2(), ignore_id: int = -1) -> Array[Vector2]:
+	var doors: Array[Vector2] = []
+	var wall := _shared_wall(a, b)
+	if wall.is_empty():
+		return doors
+	var side: Vector2 = wall.side
+	var left := building_rect(a).grow(-GRID)
+	var right := building_rect(b).grow(-GRID)
+	var center := (float(wall.start) + float(wall.end)) * 0.5
+	var first_steps: Array[int] = []
+	var second_steps: Array[int] = []
+	var best_distance := INF
+	var from_axis := 0
+	var to_axis := 0
+	for axis in range(int(wall.start) + GRID / 2, int(wall.end), GRID):
+		var edge := Vector2(wall.edge, axis) if side.x else Vector2(axis, wall.edge)
+		var first := edge - side * (GRID * 1.5)
+		var second := edge + side * (GRID * 1.5)
+		if left.has_point(first) and _clear_passage_step(first, a.id, extra, ignore_id):
+			first_steps.append(axis)
+		if right.has_point(second) and _clear_passage_step(second, b.id, extra, ignore_id):
+			second_steps.append(axis)
+	for first in first_steps:
+		for second in second_steps:
+			if absi(first - second) > GRID:
+				continue
+			var distance := absi(first - second) * 100.0 + absf((first + second) * 0.5 - center)
+			if distance < best_distance:
+				best_distance = distance
+				from_axis = mini(first, second)
+				to_axis = maxi(first, second)
+	if not is_finite(best_distance):
+		return doors
+	for axis in range(from_axis, to_axis + 1, GRID):
+		var edge := Vector2(wall.edge, axis) if side.x else Vector2(axis, wall.edge)
+		doors.append(edge - side * GRID * 0.5)
+	return doors
+
+
+func _clear_passage_step(point: Vector2, building_id: int, extra: Rect2, ignore_id: int) -> bool:
+	if extra.has_point(point):
+		return false
+	for asset in assets:
+		if asset.id != ignore_id and asset.building_id == building_id and asset_rect(asset).has_point(point):
+			return false
+	return true
+
+
+func shared_doors(building: Dictionary) -> Array[Vector2]:
+	var doors: Array[Vector2] = []
+	for neighbor in buildings:
+		if neighbor.id == building.id:
+			continue
+		doors.append_array(_shared_passage(building, neighbor))
+	return doors
+
+
+func external_door_open(building: Dictionary) -> bool:
+	var outside := building_at(door_point(building) + door_side(building) * GRID)
+	return outside.is_empty() or outside.kind == "pool"
+
+
+func rotate_building(id: int) -> Dictionary:
+	var unit := building_unit(id)
+	if unit.is_empty():
+		return _fail("Select a building to rotate it.")
+	var bounds := building_rect(unit[0])
+	var members := {}
+	for member in unit:
+		members[member.id] = member
+		bounds = bounds.merge(building_rect(member))
+	var data := snapshot()
+	for building in data.buildings:
+		if not members.has(building.id):
+			continue
+		var local := building_rect(building)
+		local.position -= bounds.position
+		var turned := _rotate_rect(local, bounds.size)
+		turned.position += bounds.position
+		building.rect = _rect_data(turned)
+		building.rotation = posmod(int(building.rotation) + 1, 4)
+	for asset in data.assets:
+		if not members.has(asset.building_id):
+			continue
+		var parent := building_rect(members[asset.building_id])
+		var local := Rect2(Vector2(asset.cell[0], asset.cell[1]) * GRID, asset_rect(asset).size)
+		var position := Vector2i(_rotate_rect(local, parent.size).position / GRID)
+		asset.cell = [position.x, position.y]
+		asset.rotation = posmod(int(asset.rotation) + 1, 4)
+	var next_id := _next_id
+	var candidate: RefCounted = get_script().new(false)
+	var valid: bool = candidate.restore(data)
+	_next_id = next_id
+	if not valid:
+		return _fail("Rotation needs clear land for the building, furnishings and surroundings.")
+	if not _preserves_access(candidate):
+		return _fail("Rotation would block a route to a room or facility.")
+	if candidate.building_unit(id).size() != unit.size():
+		return _fail("Leave space between the rotated unit and other buildings.")
+	for member in unit:
+		for neighbor in unit:
+			if member.id < neighbor.id and not _shared_passage(member, neighbor).is_empty():
+				if candidate._shared_passage(candidate.building_by_id(member.id), candidate.building_by_id(neighbor.id)).is_empty():
+					return _fail("Rotation would block an interior doorway.")
+	buildings.assign(candidate.buildings)
+	assets.assign(candidate.assets)
+	_normalize_exterior(id)
+	_invalidate()
+	return {"ok": true, "reason": "", "id": id}
+
+
+func _preserves_access(candidate: RefCounted) -> bool:
+	for building in buildings:
+		if building.kind == "bedroom" and _fixture_point(building, "bed").is_finite():
+			if not candidate._fixture_point(candidate.building_by_id(building.id), "bed").is_finite():
+				return false
+	for station in range(3):
+		if not route(ENTRY, station_point(station)).is_empty() and candidate.route(ENTRY, candidate.station_point(station)).is_empty():
+			return false
+	var remaining_tables: Array[Dictionary] = candidate.dining_tables()
+	for table in dining_tables():
+		if not remaining_tables.any(func(other: Dictionary) -> bool: return other.id == table.id):
+			return false
+	for amenity in amenities():
+		if candidate.amenity_by_id(amenity.id).is_empty():
+			return false
+	return ocean_access().is_empty() or not candidate.ocean_access().is_empty()
 
 
 func remove_building(id: int) -> Dictionary:
@@ -374,11 +631,11 @@ func asset_rect(asset: Dictionary) -> Rect2:
 	return Rect2(building_rect(building).position + Vector2(asset.cell[0], asset.cell[1]) * GRID, Vector2(asset_size(asset.kind, asset.get("rotation", 0))) * GRID)
 
 
-func validate_asset(kind: String, building_id: int, cell: Vector2i, rotation: int = 0) -> Dictionary:
+func validate_asset(kind: String, building_id: int, cell: Vector2i, rotation: int = 0, ignore_id: int = -1, check_passages: bool = true) -> Dictionary:
 	var building := building_by_id(building_id)
 	if not ASSET_CATALOG.has(kind) or building.is_empty():
 		return _fail("Place furnishings inside a building or on a pool deck.")
-	if assets.size() >= 512:
+	if assets.size() >= 512 and ignore_id < 0:
 		return _fail("Furniture limit reached.")
 	var allowed: Array = ASSET_CATALOG[kind].allowed
 	if not allowed.is_empty() and not building.kind in allowed:
@@ -387,18 +644,22 @@ func validate_asset(kind: String, building_id: int, cell: Vector2i, rotation: in
 	if not building_rect(building).grow(-GRID).encloses(rect):
 		return _fail("Keep furnishings inside the walls or deck edge.")
 	var door := door_point(building)
-	if rect.intersects(Rect2(door - Vector2(4, 12), Vector2(8, 16))):
+	if rect.has_point(door - door_side(building) * GRID):
 		return _fail("Leave the doorway and its inside approach clear.")
 	if building.kind == "pool" and rect.intersects(water_rect(building)):
 		return _fail("Place furnishings on the deck, outside the pool water.")
 	for asset in assets:
-		if rect.intersects(asset_rect(asset)):
+		if asset.id != ignore_id and rect.intersects(asset_rect(asset)):
 			return _fail("Furniture cannot overlap.")
+	if check_passages:
+		for neighbor in buildings:
+			if neighbor.id != building.id and not _shared_passage(building, neighbor).is_empty() and _shared_passage(building, neighbor, rect, ignore_id).is_empty():
+				return _fail("Leave the shared doorway and its approach clear.")
 	return {"ok": true, "reason": "", "id": -1}
 
 
-func add_asset(kind: String, building_id: int, cell: Vector2i, rotation: int = 0) -> Dictionary:
-	var result := validate_asset(kind, building_id, cell, rotation)
+func add_asset(kind: String, building_id: int, cell: Vector2i, rotation: int = 0, check_passages: bool = true) -> Dictionary:
+	var result := validate_asset(kind, building_id, cell, rotation, -1, check_passages)
 	if not result.ok:
 		return result
 	var id := _next_id
@@ -415,6 +676,27 @@ func remove_asset(id: int) -> Dictionary:
 			_invalidate()
 			return {"ok": true, "reason": "", "id": id}
 	return _fail("No furnishing here.")
+
+
+func rotate_asset(id: int) -> Dictionary:
+	for asset in assets:
+		if asset.id != id:
+			continue
+		var rotation := posmod(int(asset.rotation) + 1, 4)
+		var result := validate_asset(asset.kind, asset.building_id, Vector2i(asset.cell[0], asset.cell[1]), rotation, id)
+		if not result.ok:
+			return result
+		var original := int(asset.rotation)
+		var had_room := _fixture_point(building_by_id(asset.building_id), "bed").is_finite()
+		var readiness_before := readiness()
+		asset.rotation = rotation
+		_invalidate()
+		if (readiness_before.ok and not readiness().ok) or (had_room and not _fixture_point(building_by_id(asset.building_id), "bed").is_finite()):
+			asset.rotation = original
+			_invalidate()
+			return _fail("Rotation would block an important route.")
+		return {"ok": true, "reason": "", "id": id}
+	return _fail("Select a furnishing to rotate it.")
 
 
 func building_at(world: Vector2) -> Dictionary:
@@ -449,15 +731,15 @@ func _rebuild_graph() -> void:
 	if not _dirty:
 		return
 	_graph = AStarGrid2D.new()
-	_graph.region = Rect2i(-20, -15, 120, 75)
+	_graph.region = Landscape.REGION
 	_graph.cell_size = Vector2(GRID, GRID)
 	_graph.offset = Vector2(4, 4)
 	_graph.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
 	_graph.update()
 	# Paint collision regions once per edit, rather than testing every furnishing
 	# against every world cell. Dense furnished layouts keep the same edit cost.
-	for y in range(-15, 60):
-		for x in range(-20, 100):
+	for y in range(Landscape.REGION.position.y, Landscape.REGION.end.y):
+		for x in range(Landscape.REGION.position.x, Landscape.REGION.end.x):
 			var cell := Vector2i(x, y)
 			_graph.set_point_solid(cell, not landscape.cell_is_dry(cell))
 			var weight := 1.0 if not landscape.path_at(cell).is_empty() else (3.0 if landscape.terrain_at(cell) == "sand" else 2.5)
@@ -471,7 +753,10 @@ func _rebuild_graph() -> void:
 			var region := Rect2i(_cell(r.position), Vector2i(r.size / GRID))
 			_graph.fill_solid_region(region)
 			_graph.fill_solid_region(region.grow(-1), false)
-			_graph.set_point_solid(_cell(door_point(building)), false)
+			if external_door_open(building):
+				_graph.set_point_solid(_cell(door_point(building)), false)
+			for door in shared_doors(building):
+				_graph.set_point_solid(_cell(door), false)
 			for y in range(region.position.y, region.end.y):
 				for x in range(region.position.x, region.end.x):
 					_graph.set_point_weight_scale(Vector2i(x, y), 1.0)
@@ -485,6 +770,8 @@ func _rebuild_graph() -> void:
 
 
 func route(from: Vector2, to: Vector2) -> PackedVector2Array:
+	if not from.is_finite() or not to.is_finite():
+		return PackedVector2Array()
 	_rebuild_graph()
 	var start := _cell(from)
 	var end := _cell(to)
@@ -496,6 +783,29 @@ func route(from: Vector2, to: Vector2) -> PackedVector2Array:
 	var result := _graph.get_point_path(start, end)
 	_routes[key] = result
 	return result
+
+
+func ocean_access() -> Dictionary:
+	if _ocean_access_cached:
+		return _ocean_access.duplicate()
+	_ocean_access_cached = true
+	# Search the fixed beach near the central resort before fallback rows.
+	for offset in range(30):
+		var y := 19 + (offset + 1) / 2 * (1 if offset % 2 else -1)
+		var world_y := float(y * GRID + GRID / 2)
+		for x in range(89, 48, -1):
+			var cell := Vector2i(x, y)
+			if not landscape.cell_is_dry(cell):
+				continue
+			var shore := landscape.cell_rect(cell).get_center()
+			if not landscape.is_water_pixel(shore + Vector2(16, 0)) or route(ENTRY, shore).is_empty() or not building_at(shore).is_empty():
+				break
+			var water := Vector2(shore.x + 32, world_y)
+			if landscape.is_water_pixel(water):
+				_ocean_access = {"shore": shore, "water": water}
+				return _ocean_access.duplicate()
+			break
+	return {}
 
 
 func _fixture_point(building: Dictionary, kind: String) -> Vector2:
@@ -583,11 +893,18 @@ func _table_seats(table: Dictionary, counter: Vector2, used_seats: Dictionary) -
 		[Vector2(r.position.x + 4, r.position.y - 4), Vector2(r.end.x - 4, r.position.y - 4)],
 		[Vector2(r.end.x + 4, r.position.y + 4), Vector2(r.end.x + 4, r.end.y - 4)],
 	]
+	# Prefer diners across the tabletop. These two sides keep both seats
+	# reachable without requiring space in front of or behind the table.
+	var west: Array = sides[1]
+	var east: Array = sides[3]
+	for pair: Array in [[west[1], east[1]], [west[0], east[0]], [west[1], east[0]], [west[0], east[1]]]:
+		if _table_seat_open(pair[0], inside, counter, used_seats) and _table_seat_open(pair[1], inside, counter, used_seats):
+			return [pair[0], pair[1]]
 	var open_seats: Array[Vector2] = []
 	for side_offset in range(sides.size()):
 		var free_side: Array[Vector2] = []
 		for point in sides[(table.rotation + side_offset) % sides.size()]:
-			if used_seats.has(point) or not inside.has_point(point) or route(counter, point).is_empty():
+			if not _table_seat_open(point, inside, counter, used_seats):
 				continue
 			free_side.append(point)
 			open_seats.append(point)
@@ -607,6 +924,10 @@ func _table_seats(table: Dictionary, counter: Vector2, used_seats: Dictionary) -
 	return []
 
 
+func _table_seat_open(point: Vector2, interior: Rect2, counter: Vector2, used_seats: Dictionary) -> bool:
+	return interior.has_point(point) and not used_seats.has(point) and not route(counter, point).is_empty()
+
+
 func amenities(kind: String = "") -> Array[Dictionary]:
 	if not _amenities_cached:
 		_amenities_cached = true
@@ -615,7 +936,7 @@ func amenities(kind: String = "") -> Array[Dictionary]:
 			if not info.has("capacity"):
 				continue
 			var bounds := prop_rect(prop)
-			var access := _amenity_access(bounds)
+			var access := _facility_access(prop) if info.get("gate", false) else _amenity_access(bounds)
 			if access != Vector2.INF:
 				_amenities_cache.append({
 					"id": prop.id, "kind": prop.kind, "point": access, "rect": bounds,
@@ -634,6 +955,24 @@ func amenity_by_id(id: int) -> Dictionary:
 		if amenity.id == id:
 			return amenity
 	return {}
+
+
+func facility_gate(prop: Dictionary) -> Vector2:
+	var bounds := prop_rect(prop)
+	var dimensions: Array = Landscape.PROP_CATALOG[prop.kind].size
+	var size := Vector2(dimensions[0], dimensions[1]) * GRID
+	var gate := Rect2(floorf(size.x / GRID / 2.0) * GRID, size.y, GRID, GRID)
+	for turn in range(prop.rotation):
+		gate = _rotate_rect(gate, size)
+		size = Vector2(size.y, size.x)
+	return bounds.position + gate.get_center()
+
+
+func _facility_access(prop: Dictionary) -> Vector2:
+	var point := facility_gate(prop)
+	if not building_at(point).is_empty() or route(ENTRY, point).is_empty():
+		return Vector2.INF
+	return point
 
 
 func _amenity_access(bounds: Rect2) -> Vector2:

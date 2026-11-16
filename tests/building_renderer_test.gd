@@ -3,7 +3,7 @@ extends SceneTree
 const Layout := preload("res://scripts/layout_model.gd")
 const Renderer := preload("res://scripts/building_renderer.gd")
 const TERRAIN := preload("res://assets/art/resort.png")
-const WORLD := Rect2i(-160, -120, 960, 600)
+const WORLD := Rect2i(Layout.WORLD_BOUNDS)
 const PREVIEW_CROP := Rect2i(8, 26, 465, 228)
 
 var checks := 0
@@ -36,11 +36,12 @@ class Probe extends "res://scripts/building_renderer.gd":
 		assets_drawn.append(asset.id)
 		if picture:
 			var bounds := _as_rect(asset.rect)
-			picture.blend_rect(furniture, Rect2i(_asset_source(asset, bounds.size)), bounds.position - WORLD.position)
+			var source := furniture_source(asset.kind, int(asset.get("rotation", 0)), Vector2(bounds.size))
+			picture.blend_rect(furniture, Rect2i(source), bounds.position - Vector2i(FURNITURE_LIFT) - WORLD.position)
 
-	func _draw_pool(bounds: Rect2i, upgraded: bool) -> void:
-		terrace_water = _water_rect(bounds)
-		super(bounds, upgraded)
+	func _draw_pool(bounds: Rect2i, building: Dictionary) -> void:
+		terrace_water = _as_rect(building.get("water", _water_rect(bounds)))
+		super(bounds, building)
 
 	func _draw_plaque_text(font: Font, at: Vector2, label: String) -> void:
 		labels_drawn.append(label)
@@ -159,8 +160,9 @@ func _run() -> void:
 	model.set_building_finish(rooms[3].id, "floor", "stone")
 	model.set_building_finish(lobby.id, "wall", "plaster")
 	model.set_building_finish(restaurant.id, "wall", "brick")
+	model.set_building_finish(restaurant.id, "facade", "brick")
 	model.set_building_finish(restaurant.id, "ceiling", "panels")
-	probe.present(model.buildings, model.render_assets(), 1.0)
+	probe.present(Renderer.resolve_buildings(model), model.render_assets(), 1.0)
 	var pool_images: Array[PackedByteArray] = []
 	for row in [0, 1, 2]:
 		probe.set_view(row == 1, restaurant.id if row == 2 else -1)
@@ -177,7 +179,8 @@ func _run() -> void:
 		_check(probe.assets_drawn.size() == [8, 1, 6][row], "Indoor furniture filter in view %s" % row)
 		_check(probe.finishes_drawn.has("floor/tile") == (row != 1), "Interior floor shows only in cutaway")
 		_check(probe.finishes_drawn.has("ceiling/panels") == (row == 2), "Ceiling preview shows only while inspecting")
-		_check(probe.finishes_drawn.has("wall/brick"), "Brick shows on the interior wall and exterior facade")
+		_check(probe.finishes_drawn.has("wall/brick") == (row != 1)
+			and probe.finishes_drawn.has("facade/brick") == (row == 1), "Interior wall and exterior facade draw their selected finish")
 		_check(probe.labels_drawn.has("Lobby") and probe.labels_drawn.has("Restaurant"), "Full starter station names fit")
 		if export_preview:
 			var preview_section := Rect2i(PREVIEW_CROP.position - WORLD.position, PREVIEW_CROP.size)
@@ -188,7 +191,7 @@ func _run() -> void:
 
 	var renderer := Renderer.new()
 	root.add_child(renderer)
-	renderer.present(model.buildings, model.render_assets(), 2.0)
+	renderer.present(Renderer.resolve_buildings(model), model.render_assets(), 2.0)
 	await process_frame
 	renderer.set_view(true)
 	await process_frame

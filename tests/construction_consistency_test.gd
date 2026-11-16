@@ -53,7 +53,7 @@ func _run() -> void:
 		var scenery: Dictionary = design.draft.landscape.props[0]
 		var scenery_point := design.draft.prop_rect(scenery).get_center()
 		check(design.press(scenery_point) and design.draft.landscape.prop_by_id(scenery.id).is_empty(), "Ordinary scenery uses the same bulldozer from " + category)
-	for kind: String in Sim.LEISURE_DURATIONS:
+	for kind: String in Sim.STARTER_LEISURE:
 		for free in [false, true]:
 			_test_purchase_and_remove(kind, free)
 	_test_occupied_removal()

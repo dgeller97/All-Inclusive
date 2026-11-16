@@ -8,10 +8,13 @@ Source generator: assets/art/generate_art.mjs
 Original pixel UI icons: scripts/resort_ui.gd
 Original modular buildings and furnishings: scripts/building_renderer.gd
 Original exterior facades and signs: scripts/building_renderer.gd
-Original floor/wall/ceiling pixel textures: assets/art/building_finishes.gd
+Original interior, facade and roof pixel textures: assets/art/building_finishes.gd
 Original guest plate, chair and seated-eating artwork: scripts/resort_map.gd
-Original beach lounge, volleyball, bar and stage artwork: scripts/amenity_renderer.gd
-Original beach leisure guest animations: scripts/resort_map.gd
+Original beach venue artwork: scripts/amenity_renderer.gd
+Original pool, sport and entertainment venue artwork: scripts/facility_renderer.gd
+Original dining and swimming guest animations: scripts/resort_map.gd
+Original native-scale seated guest poses: scripts/seated_art.gd
+Original expanded activity guest animations: scripts/facility_activity.gd
 Original editable terrain and scenery, plus ocean animation: scripts/landscape_renderer.gd and scripts/ocean.gd
 Original construction menu icons: scripts/design_ui.gd
 

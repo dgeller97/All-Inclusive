@@ -8,7 +8,8 @@ const SaveSlot = preload("res://scripts/save_slot.gd")
 const Layout = preload("res://scripts/layout_model.gd")
 const ResortDesign = preload("res://scripts/resort_design.gd")
 const DesignUI = preload("res://scripts/design_ui.gd")
-const SAVE_VERSION := 7
+const SAVE_VERSION := 8
+const LEISURE_SAVE_VERSION := 7
 const DINING_SAVE_VERSION := 6
 const EXTERIOR_SAVE_VERSION := 5
 const LANDSCAPE_SAVE_VERSION := 4
@@ -49,6 +50,7 @@ var toast_time := 0.0
 var last_notice := ""
 
 var overlay: ColorRect
+var interface_layer: CanvasLayer
 var dialog: Panel
 var dialog_status: Label
 var dialog_shadow: Panel
@@ -56,6 +58,9 @@ var dialog_load_button: Button
 var music: AudioStreamPlayer
 var ambience: AudioStreamPlayer
 var effects: Dictionary = {}
+var animation_viewer: Control
+var _viewer_return_focus: Control
+var _viewer_ui_input := false
 
 
 func _ready() -> void:
@@ -72,6 +77,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if is_instance_valid(animation_viewer) and animation_viewer.visible:
+		return
 	if not simulation:
 		return
 	var advancing := started and not paused and not settings_open and menu_mode.is_empty() and not simulation.stopped and design.draft == null
@@ -93,6 +100,15 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if is_instance_valid(animation_viewer) and animation_viewer.visible:
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_ESCAPE, KEY_F8]:
+			animation_viewer.close()
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
+		_open_animation_viewer()
+		get_viewport().set_input_as_handled()
+		return
 	if not menu_mode.is_empty() and design and design.draft:
 		return
 	if design and design.draft:
@@ -104,12 +120,16 @@ func _input(event: InputEvent) -> void:
 		return
 	if not menu_mode.is_empty() and event.keycode != KEY_ESCAPE:
 		return
+	if event.keycode != KEY_ESCAPE and ui.has_transient_popup():
+		return
 	get_viewport().set_input_as_handled()
 	if event.echo or not started or not menu_mode.is_empty():
 		return
 	match event.keycode:
 		KEY_ESCAPE:
-			if ui.has_open_panel():
+			if ui.close_transient_popup():
+				return
+			elif ui.has_open_panel():
 				ui.close_panel()
 			else:
 				ui.open_panel("settings")
@@ -125,6 +145,9 @@ func _set_simulation(value: Sim) -> void:
 		simulation.event_happened.disconnect(_on_simulation_event)
 	simulation = value
 	simulation.event_happened.connect(_on_simulation_event)
+	if camera:
+		camera.home_center = Vector2(160, 120) if simulation.mode == "developer" else Vector2(280, 170)
+		camera.home_zoom = 1.0 if simulation.mode == "developer" else 1.7
 
 
 func _build_screen() -> void:
@@ -142,29 +165,37 @@ func _build_screen() -> void:
 	design.name = "DesignPreview"
 	camera.world.add_child(design)
 
+	# World depth (including elevated building plaques) must never outrank menus.
+	# Canvas layers isolate that ordering without changing guest/object occlusion.
+	interface_layer = CanvasLayer.new()
+	interface_layer.name = "Interface"
+	interface_layer.layer = 1
+	add_child(interface_layer)
 	ui = ResortUI.new()
 	ui.name = "ResortUI"
-	add_child(ui)
+	interface_layer.add_child(ui)
 	ui.action_requested.connect(_on_ui_action)
 	design_ui = DesignUI.new()
 	design_ui.name = "DesignUI"
-	add_child(design_ui)
+	interface_layer.add_child(design_ui)
 	design_ui.action_requested.connect(_on_design_action)
 	camera.pointer_blocked = func(point: Vector2) -> bool:
 		return design_ui.is_pointer_over_ui(point) if design.draft else ui.is_pointer_over_ui(point)
 	camera.interaction_allowed = func() -> bool:
-		return started and menu_mode.is_empty() and not settings_open
+		return started and menu_mode.is_empty() and not settings_open and not (is_instance_valid(animation_viewer) and animation_viewer.visible)
 	camera.view_changed.connect(_on_camera_changed)
 
 	overlay = ColorRect.new()
 	overlay.color = Color(0.12, 0.07, 0.12, 0.72)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(overlay)
+	interface_layer.add_child(overlay)
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.hide()
 
 
 func _on_ui_action(action: String, value: Variant) -> void:
+	if is_instance_valid(animation_viewer) and animation_viewer.visible:
+		return
 	if action == "open_panel" or action == "close_panel":
 		settings_open = action == "open_panel" and value == "settings"
 		camera.cancel_drag()
@@ -174,10 +205,38 @@ func _on_ui_action(action: String, value: Variant) -> void:
 		return
 	if not started or not menu_mode.is_empty():
 		return
+	if action in ["developer_month", "developer_sargassum", "developer_arrival", "developer_rescue_drill"] and simulation.mode != "developer":
+		return
+	if action == "room_price":
+		simulation.set_price(value)
+		_refresh_ui()
+		return
+	if action == "developer_sargassum":
+		if simulation.set_developer_sargassum_intensity(value):
+			_refresh()
+		return
 	_play_effect(&"click")
 	match action:
 		"package": _set_package(value)
+		"swim_policy":
+			if simulation.set_swim_policy(value):
+				_refresh()
+		"clean_beach":
+			var result := simulation.clean_beach()
+			_toast("Removed %d%% sargassum buildup." % result.removed if result.ok else result.reason)
+			_refresh()
 		"staff": _set_station(value)
+		"hire_lifeguard", "assign_lifeguard": _set_guard_site(value, action == "hire_lifeguard")
+		"developer_month":
+			if simulation.set_developer_month(value):
+				_refresh()
+		"developer_arrival":
+			if simulation.seed_sargassum_arrival():
+				_toast("New offshore patch drifting toward shore.")
+				_refresh()
+			else:
+				_toast("An offshore patch could not be added.")
+		"developer_rescue_drill": _start_rescue_drill()
 		"build": _enter_design()
 		"building_view":
 			exterior_view = not exterior_view
@@ -187,15 +246,44 @@ func _on_ui_action(action: String, value: Variant) -> void:
 		"save": _save_run()
 		"load": _load_run()
 		"mute": _toggle_mute()
+		"animations": _open_animation_viewer()
 		"quit": get_tree().quit()
 		"zoom_in": camera.zoom_in()
 		"zoom_out": camera.zoom_out()
 		"home": camera.home()
 
 
+func _open_animation_viewer() -> void:
+	if is_instance_valid(animation_viewer) and animation_viewer.visible:
+		return
+	ui.close_transient_popup()
+	_viewer_return_focus = get_viewport().gui_get_focus_owner()
+	_viewer_ui_input = ui.is_processing_input()
+	ui.set_process_input(false)
+	camera.cancel_drag()
+	if design.draft and design.is_drawing():
+		design._reset_drag()
+		design._update_ghost()
+	if not is_instance_valid(animation_viewer):
+		animation_viewer = load("res://scripts/animation_viewer.gd").new()
+		animation_viewer.name = "AnimationViewer"
+		interface_layer.add_child(animation_viewer)
+		animation_viewer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		animation_viewer.viewer_closed.connect(_on_animation_viewer_closed)
+	animation_viewer.show_viewer()
+
+
+func _on_animation_viewer_closed() -> void:
+	ui.set_process_input(_viewer_ui_input)
+	if is_instance_valid(_viewer_return_focus) and _viewer_return_focus.is_visible_in_tree():
+		_viewer_return_focus.grab_focus()
+	_viewer_return_focus = null
+
+
 func _present_map(layout_changed: bool = false) -> void:
 	var ceiling_id := design.settings_building_id if design.inspect_ceiling else -1
-	map.present(simulation, float(simulation.second) + elapsed, design.draft, layout_changed, exterior_view, ceiling_id)
+	var shown_exterior := design.inspect_exterior if design.draft else exterior_view
+	map.present(simulation, float(simulation.second) + elapsed, design.draft, layout_changed, shown_exterior, ceiling_id)
 
 
 func _enter_design() -> void:
@@ -246,7 +334,8 @@ func _design_input(event: InputEvent) -> void:
 				else:
 					design.cancel_operation()
 			KEY_R:
-				design.rotate_asset()
+				if design.rotate_asset():
+					_present_map(true)
 			KEY_HOME:
 				if design.is_drawing():
 					design.cancel_operation()
@@ -298,10 +387,11 @@ func _on_design_action(action: String, value: Variant) -> void:
 		return
 	_play_effect(&"click")
 	match action:
-		"tool", "building", "asset", "bulldoze", "category", "landscape_group", "terrain", "path", "restore", "brush_size", "prop", "move":
+		"tool", "building", "asset", "bulldoze", "category", "landscape_group", "facility_group", "terrain", "path", "restore", "brush_size", "prop", "move":
 			design.choose(action, value)
 		"rotate":
-			design.rotate_asset()
+			if design.rotate_asset():
+				_present_map(true)
 		"open_building_settings":
 			camera.cancel_drag()
 			design.open_building_settings()
@@ -309,6 +399,8 @@ func _on_design_action(action: String, value: Variant) -> void:
 			design.close_building_settings()
 		"inspect_ceiling":
 			design.toggle_ceiling_inspection()
+		"inspect_exterior":
+			design.set_exterior_inspection(not design.inspect_exterior)
 		"building_name":
 			var result := design.draft.set_building_name(design.settings_building_id, value)
 			if result.ok:
@@ -319,6 +411,8 @@ func _on_design_action(action: String, value: Variant) -> void:
 		"building_finish":
 			var result := design.draft.set_building_finish(design.settings_building_id, value.surface, value.choice)
 			if result.ok:
+				if value.surface in ["facade", "roof"]:
+					design.set_exterior_inspection(true)
 				_present_map(true)
 		"apply":
 			if design.is_drawing():
@@ -357,17 +451,17 @@ func _refresh_design_ui() -> void:
 		design_ui.refresh({"active": false})
 		return
 	var ceiling_id := design.settings_building_id if design.inspect_ceiling else -1
-	if map.ceiling_id != ceiling_id:
+	if map.ceiling_id != ceiling_id or map.exterior_view != design.inspect_exterior:
 		_present_map()
 	var result := simulation.construction_status(design.draft)
 	var placement := design.placement_feedback()
 	var state := {
 		"active": true, "tool": design.tool, "selected_tool": design.selected_tool(),
-		"category": design.category, "landscape_group": design.landscape_group,
+		"category": design.category, "landscape_group": design.landscape_group, "facility_group": design.facility_group,
 		"brush_size": design.brush_size, "can_move": design.can_move(), "can_rotate": design.can_rotate(),
-		"rotation": design.asset_rotation, "feedback": placement.text, "selection": design.selection_text(),
+		"rotation": design.displayed_rotation(), "feedback": placement.text, "selection": design.selection_text(),
 		"selected_building": design.selected_building(), "building_settings_open": design.settings_building_id >= 0,
-		"inspect_ceiling": design.inspect_ceiling,
+		"inspect_ceiling": design.inspect_ceiling, "inspect_exterior": design.inspect_exterior,
 		"mode": simulation.mode, "cost": result.cost, "refund": result.refund, "cash": simulation.cash,
 		"can_apply": result.ok, "apply_reason": result.reason, "defer_apply": result.defer,
 		"apply_day": simulation.day + 1, "has_pending": simulation.pending_layout != null,
@@ -478,7 +572,7 @@ func _format_rating(rating: float) -> String:
 
 
 func _set_package(index: int) -> void:
-	simulation.selected_package = index
+	simulation.set_price(Sim.PACKAGES[index].price)
 	var effective_day: int = simulation.day + int(simulation.booked_package >= 0)
 	_toast("%s package selected for Day %d." % [Sim.PACKAGES[index].name, effective_day])
 	_refresh()
@@ -489,6 +583,36 @@ func _set_station(index: int) -> void:
 		simulation.float_station = index
 		_toast("Float assigned to %s. Active service continues." % simulation.station_name(index))
 	_refresh()
+
+
+func _set_guard_site(site: String, hire: bool) -> void:
+	var ok: bool = simulation.hire_lifeguard(site) if hire else simulation.assign_lifeguard(site)
+	if ok:
+		var site_name := "beach" if site == "beach" else "main pool"
+		_toast("Lifeguard hired for the %s." % site_name if hire else "Lifeguard reassigned to the %s." % site_name)
+		_refresh()
+	elif not simulation.rescue.is_empty():
+		_toast("The lifeguard is assisting a swimmer.")
+	elif not simulation.lifeguard_site_available(site):
+		_toast("No usable lifeguard post at this site.")
+	elif hire and simulation.cash < Sim.LIFEGUARD_HIRE_COST:
+		_toast("Hiring a lifeguard costs $%d." % Sim.LIFEGUARD_HIRE_COST)
+
+
+func _start_rescue_drill() -> void:
+	if simulation.start_rescue_drill():
+		var label := "Beach" if simulation.lifeguard_assignment == "beach" else "Main pool"
+		var volunteer: bool = int(simulation.rescue.get("family", -1)) < 0
+		_toast("%s drill started with a volunteer." % label if volunteer else "%s rescue drill started." % label)
+		_refresh()
+	elif simulation.lifeguard_assignment.is_empty():
+		_toast("Hire a lifeguard in Staff to run a drill.")
+	elif not simulation.rescue.is_empty():
+		_toast("Finish the active rescue before starting a drill.")
+	elif not simulation.lifeguard_site_available(simulation.lifeguard_assignment):
+		_toast("The assigned site has no usable lifeguard post.")
+	else:
+		_toast("Wait until tomorrow to start another drill.")
 
 
 func _toggle_pause() -> void:
@@ -514,8 +638,19 @@ func _on_simulation_event(kind: StringName, details: Dictionary) -> void:
 			_toast("Pool terrace installed  ·  +1 pool slot")
 		&"review":
 			_toast("%s reviewed their stay  ·  %d/100" % [simulation.room_name(details.room), details.score])
+		&"ocean_incident":
+			_toast("Fatal ocean incident. The surviving guest is leaving.", 12.0)
+		&"rescue_started":
+			if not details.get("drill", false):
+				_toast("The lifeguard is responding to a swimmer.", 8.0)
+		&"rescue_finished":
+			match details.get("outcome", ""):
+				"rescued": _toast("The lifeguard brought the swimmer to safety.", 8.0)
+				"drill_complete": _toast("Rescue drill complete.")
+				"self_recovered": _toast("The swimmer returned to safety.", 8.0)
 		&"day_close":
-			_toast("Day %d closed  ·  %d stays  ·  $120 payroll  ·  $%d cash" % [details.day, details.stays, details.cash], 12.0)
+			_toast("Day %d closed  ·  %d stays  ·  $%d payroll  ·  $%d cash" % [details.day, details.stays,
+				details.get("payroll", Sim.PAYROLL), details.cash], 12.0)
 		&"construction_applied":
 			_toast("Queued construction applied on Day %d." % simulation.day, 12.0)
 	_play_effect(kind)
@@ -576,18 +711,19 @@ func _make_dialog(width: float, height: float) -> void:
 
 
 func _build_welcome() -> void:
-	_make_dialog(624, 435)
+	_make_dialog(624, 510)
 	_label(dialog, Rect2(30, 34, 564, 55), "All Inclusive", 43, INK, HORIZONTAL_ALIGNMENT_LEFT, display_font)
 	_label(dialog, Rect2(31, 100, 558, 25), "Welcome families for three days at your tropical resort.", 18, INK)
 	_label(dialog, Rect2(31, 132, 560, 46), "Families check in, settle into a bedroom, collect food,\neat at a restaurant table, then head to the pool.", 16, MUTED)
 	var objectives := _panel(dialog, Rect2(29, 189, 566, 63), CARD, LINE, 4)
 	_label(objectives, Rect2(13, 4, 535, 23), "YOUR DAY 3 TARGETS", 12, WINE)
 	_label(objectives, Rect2(13, 28, 535, 23), "8 completed stays    ·    75 average rating    ·    Pool terrace", 16, INK)
-	_label(dialog, Rect2(31, 261, 560, 62), "Use Booking before 00:20 and Staff to shorten queues.\nUse Build to draw buildings, furnish rooms and edit the landscape.\nDrag the map to explore, scroll to zoom, and press Home to reset.", 15, INK)
+	_label(dialog, Rect2(31, 257, 560, 99), "Set the room price before 08:00 and use Staff to shorten queues.\nUse Beach for swimming rules and Build to reshape the resort.\nDrag to explore, scroll to zoom, and press Home to reset.\nDeveloper showcase: every asset placed, with free editing.", 15, INK)
 
-	var start := _button(dialog, Rect2(29, 344, 182, 42), "Regular resort", _new_run.bind("regular"), 16, true)
-	_button(dialog, Rect2(221, 344, 214, 42), "Developer · Free build", _new_run.bind("developer"), 15)
-	_add_load_button(Rect2(445, 344, 150, 42), 15)
+	var start := _button(dialog, Rect2(29, 365, 182, 42), "Regular resort", _new_run.bind("regular"), 16, true)
+	_button(dialog, Rect2(221, 365, 214, 42), "Developer showcase", _new_run.bind("developer"), 15)
+	_add_load_button(Rect2(445, 365, 150, 42), 15)
+	_button(dialog, Rect2(29, 418, 566, 36), "Animation viewer · Compare all four rotations (F8)", _open_animation_viewer, 15)
 	_focus_dialog_button.call_deferred(start)
 
 
@@ -621,12 +757,12 @@ func _add_load_button(rect: Rect2, font_size: int = 15) -> void:
 
 
 func _build_new_run() -> void:
-	_make_dialog(540, 204)
+	_make_dialog(540, 232)
 	_label(dialog, Rect2(29, 29, 480, 45), "Start a fresh run", 32, INK, HORIZONTAL_ALIGNMENT_LEFT, display_font)
-	_label(dialog, Rect2(29, 78, 480, 23), "Regular mode charges for buildings, furnishings and landscaping.", 16, MUTED)
-	var start := _button(dialog, Rect2(29, 117, 154, 42), "Regular resort", _new_run.bind("regular"), 15, true)
-	_button(dialog, Rect2(193, 117, 194, 42), "Developer · Free build", _new_run.bind("developer"), 15)
-	_button(dialog, Rect2(397, 117, 114, 42), "Back", _open_dialog.bind("recap"), 15)
+	_label(dialog, Rect2(29, 78, 480, 50), "Regular: build your resort and pay construction costs.\nDeveloper: every asset placed, ready to watch and freely edit.", 16, MUTED)
+	var start := _button(dialog, Rect2(29, 145, 154, 42), "Regular resort", _new_run.bind("regular"), 15, true)
+	_button(dialog, Rect2(193, 145, 194, 42), "Developer showcase", _new_run.bind("developer"), 15)
+	_button(dialog, Rect2(397, 145, 114, 42), "Back", _open_dialog.bind("recap"), 15)
 	_focus_dialog_button.call_deferred(start)
 
 
@@ -636,8 +772,11 @@ func _focus_dialog_button(button: Button) -> void:
 
 
 func _new_run(mode: String = "regular") -> void:
-	_set_simulation(Sim.new())
-	simulation.mode = mode
+	var fresh := Sim.new()
+	if not fresh.configure_new_run(mode):
+		_show_save_error("Could not prepare the new resort. Your current run is intact.")
+		return
+	_set_simulation(fresh)
 	saved_draft = null
 	started = true
 	paused = false
@@ -650,6 +789,8 @@ func _new_run(mode: String = "regular") -> void:
 	camera.home()
 	_close_dialog()
 	_start_music()
+	if mode == "developer":
+		_toast("Every asset is placed. Guests explore activities across three days. Build edits are free.", 9.0)
 
 
 func _continue_run() -> void:
@@ -663,7 +804,7 @@ func _continue_run() -> void:
 
 func _save_run() -> void:
 	if _write_run(saved_draft):
-		var clock := "%02d:%02d" % [floori(simulation.second / 60.0), simulation.second % 60]
+		var clock: String = simulation.calendar_state().time_label
 		_toast("Run saved at Day %d  ·  %s" % [simulation.day, clock])
 	else:
 		_show_save_error("Could not save the run. Try again.")
@@ -680,9 +821,10 @@ func _write_run(draft: Layout) -> bool:
 func _load_run() -> void:
 	var data: Dictionary = SaveSlot.read()
 	var version: Variant = data.get("version")
-	var has_landscape: bool = version in [LANDSCAPE_SAVE_VERSION, EXTERIOR_SAVE_VERSION, DINING_SAVE_VERSION, SAVE_VERSION]
-	var has_appearance: bool = version in [EXTERIOR_SAVE_VERSION, DINING_SAVE_VERSION, SAVE_VERSION]
-	var has_meals: bool = version in [DINING_SAVE_VERSION, SAVE_VERSION]
+	var has_landscape: bool = version in [LANDSCAPE_SAVE_VERSION, EXTERIOR_SAVE_VERSION, DINING_SAVE_VERSION, LEISURE_SAVE_VERSION, SAVE_VERSION]
+	var has_appearance: bool = version in [EXTERIOR_SAVE_VERSION, DINING_SAVE_VERSION, LEISURE_SAVE_VERSION, SAVE_VERSION]
+	var has_meals: bool = version in [DINING_SAVE_VERSION, LEISURE_SAVE_VERSION, SAVE_VERSION]
+	var has_leisure: bool = version in [LEISURE_SAVE_VERSION, SAVE_VERSION]
 	if has_landscape and _save_changes_protected_coast(data):
 		_show_save_error("This save changes the protected coast. Your file and run are intact.")
 		return
@@ -691,14 +833,15 @@ func _load_run() -> void:
 		(version in [1, 2, 3] or has_landscape) and data.get("simulation") is Dictionary
 		and data.get("speed") is int and data.speed in SPEEDS and data.get("elapsed") is float
 		and is_finite(data.elapsed) and data.elapsed >= 0.0 and data.elapsed < 1.0
-		and loaded.restore(data.simulation, version < 3, has_landscape, has_meals, version == SAVE_VERSION)
+		and loaded.restore(data.simulation, version < 3, has_landscape, has_meals, has_leisure, version == SAVE_VERSION)
 	)
 	var draft: Layout
 	if valid and data.version >= 3:
 		valid = data.get("draft") is Dictionary
 		if valid and not data.draft.is_empty():
 			draft = Layout.new(false)
-			valid = (not has_landscape or data.draft.get("landscape") is Dictionary) and draft.restore(data.draft)
+			valid = ((not has_landscape or data.draft.get("landscape") is Dictionary)
+				and (version != SAVE_VERSION or data.draft.get("version") == 4) and draft.restore(data.draft))
 			if valid and not data.draft.has("landscape"):
 				Sim.prune_migrated_scenery(draft, loaded.layout)
 	if not valid:
@@ -824,13 +967,20 @@ func _smoke_test() -> void:
 	var ate_at_table := false
 	var left_table := false
 	var activities := {}
+	var swam_in_ocean := false
+	var saw_daylight := false
+	var saw_night := false
 	for i in range(3 * Sim.DAY_LENGTH):
 		simulation.tick()
+		var daylight: float = simulation.calendar_state().daylight
+		saw_daylight = saw_daylight or daylight > 0.9
+		saw_night = saw_night or daylight < 0.1
 		collected = collected or simulation.count_at(1, "service") > 0
 		waited_for_table = waited_for_table or simulation.count_at(1, "wait_table") > 0
 		ate_at_table = ate_at_table or simulation.count_at(1, "eating") > 0
 		left_table = left_table or simulation.count_at(1, "to_pool") > 0
 		for family in simulation.families:
+			swam_in_ocean = swam_in_ocean or family.phase == "ocean_swim"
 			for kind in family.leisure_completed:
 				activities[kind] = true
 		if simulation.day == 2 and simulation.second == 0:
@@ -840,7 +990,7 @@ func _smoke_test() -> void:
 		push_error("All Inclusive smoke test did not exercise the full restaurant meal.")
 		get_tree().quit(1)
 		return
-	if activities.size() != Sim.LEISURE_DURATIONS.size():
+	if not Sim.STARTER_LEISURE.all(func(kind: String) -> bool: return activities.has(kind)):
 		push_error("All Inclusive smoke test did not exercise all four beach activities.")
 		get_tree().quit(1)
 		return
@@ -852,7 +1002,35 @@ func _smoke_test() -> void:
 		push_error("All Inclusive smoke test rating mismatch: %f" % simulation.average())
 		get_tree().quit(1)
 		return
+	if not (saw_daylight and saw_night and swam_in_ocean and simulation.sargassum > 0 and simulation.ocean_incidents.is_empty()
+		and _smoke_risk_and_rotation()):
+		push_error("All Inclusive smoke test failed the calendar, ocean risk, pricing, or construction checks.")
+		get_tree().quit(1)
+		return
+	if not _smoke_new_facilities():
+		push_error("All Inclusive smoke test failed to exercise the ten new facilities.")
+		get_tree().quit(1)
+		return
+	if not _smoke_developer_showcase():
+		push_error("All Inclusive smoke test failed the Developer showcase.")
+		get_tree().quit(1)
+		return
+	if not await _smoke_animation_viewer():
+		push_error("All Inclusive smoke test failed the animation viewer.")
+		get_tree().quit(1)
+		return
+	var baseline := simulation.snapshot()
+	var layout_id := Layout._next_id
+	var prop_id := Layout.Landscape._next_prop_id
+	set_process(false)
+	var coast_and_rescue := await _smoke_r18_coast_and_rescue()
+	Layout._next_id = layout_id
+	Layout.Landscape._next_prop_id = prop_id
 	map.present(simulation, float(simulation.second))
+	if not coast_and_rescue or simulation.snapshot() != baseline:
+		push_error("All Inclusive smoke test failed R18 offshore landfall, lifeguard drills, or rescue save continuation.")
+		get_tree().quit(1)
+		return
 	if (
 		not map.base_art or map.base_art.get_size() != ResortMap.WORLD_BOUNDS.size
 		or not map.renderer or not map.people or map.ocean.condition_name() != "Closed"
@@ -862,8 +1040,136 @@ func _smoke_test() -> void:
 		get_tree().quit(1)
 		return
 	_open_dialog("recap")
-	print("ALL INCLUSIVE SMOKE PASS — 12 stays, %.2f rating, $1120, restaurant meals, furnished terrace, four beach activities, editable landscape, ocean and audio loaded" % simulation.average())
+	print("ALL INCLUSIVE SMOKE PASS — 12 stays, %.2f rating, $1120; dining, terrace, ten new facility visits, calendar, surf risk, sargassum, price lock, construction, art and audio; expanded Developer showcase visits all 14 activities; 20 animation viewer clips; R18 month and intensity, offshore landfall, both lifeguard posts and drills, active rescue restore" % simulation.average())
 	get_tree().quit()
+
+
+func _smoke_r18_coast_and_rescue() -> bool:
+	var trial := Sim.new()
+	if not trial.configure_new_run("developer") or not trial.set_developer_month(7) or not trial.set_developer_sargassum_intensity(70):
+		return false
+	if trial.day != 1 or trial.second != 0 or trial.calendar_state().month != 7 or trial.sargassum_intensity != 70:
+		return false
+	var forced := Sim.Sargassum.raft(0, Sim.Sargassum.FORCED_LANE, trial.sargassum_seed)
+	if not trial.seed_sargassum_arrival() or not trial.floating_sargassum().any(func(patch: Dictionary) -> bool: return patch.id == forced.id):
+		return false
+	map.present(trial, 0.0)
+	await get_tree().process_frame
+	for i in range(forced.lands_at):
+		trial.tick()
+	if trial.floating_sargassum().any(func(patch: Dictionary) -> bool: return patch.id == forced.id):
+		return false
+	if not trial.beach_deposits.any(func(pile: Dictionary) -> bool: return pile.row == forced.row and pile.amount >= forced.mass):
+		return false
+	var cash_before := trial.cash
+	if not trial.hire_lifeguard("beach") or trial.cash != cash_before:
+		return false
+	for site in ["beach", "pool"]:
+		if trial.lifeguard_assignment != site and not trial.assign_lifeguard(site):
+			return false
+		map.present(trial, float(trial.second))
+		if not map._depth_plan().any(func(item: Dictionary) -> bool: return item.tag == "lifeguard" and item.seated):
+			return false
+		await get_tree().process_frame
+		if not trial.start_rescue_drill() or trial.rescue.site != site:
+			return false
+		trial.tick()
+		if site == "beach":
+			var restored := Sim.new()
+			if not restored.restore(trial.snapshot()) or restored.rescue != trial.rescue or restored.rescue_positions() != trial.rescue_positions():
+				return false
+			trial = restored
+		map.present(trial, float(trial.second))
+		var plan := map._depth_plan()
+		if not plan.any(func(item: Dictionary) -> bool: return item.tag == "lifeguard" and not item.seated):
+			return false
+		if not plan.any(func(item: Dictionary) -> bool: return item.tag == "rescue_float"):
+			return false
+		await get_tree().process_frame
+		for i in range(Sim.RESCUE_DURATION):
+			trial.tick()
+		if not trial.rescue.is_empty() or trial.last_rescue.get("site") != site or trial.last_rescue.get("outcome") != "drill_complete":
+			return false
+	return true
+
+
+func _smoke_developer_showcase() -> bool:
+	var trial := Sim.new()
+	if not trial.configure_new_run("developer") or not trial.layout.readiness().ok:
+		return false
+	for kind: String in Layout.ASSET_CATALOG:
+		if not trial.layout.assets.any(func(item: Dictionary) -> bool: return item.kind == kind):
+			return false
+	for kind: String in Layout.Landscape.PROP_CATALOG:
+		if not trial.layout.landscape.props.any(func(item: Dictionary) -> bool: return item.kind == kind):
+			return false
+	var observed := {}
+	for tick in range(3 * Sim.DAY_LENGTH):
+		trial.tick()
+		for family: Dictionary in trial.families:
+			if family.phase == "leisure":
+				observed[family.leisure_kind] = true
+	return trial.reviews.size() == 12 and Sim.LEISURE_DURATIONS.keys().all(func(kind: String) -> bool: return observed.has(kind))
+
+
+func _smoke_animation_viewer() -> bool:
+	var before := simulation.snapshot()
+	_open_animation_viewer()
+	if not is_instance_valid(animation_viewer) or not animation_viewer.visible:
+		return false
+	var clips := Sim.LEISURE_DURATIONS.keys() + ["dining", "buffet_collection", "main_pool", "walking", "ocean_swim", "ocean_evacuation"]
+	var valid := true
+	for clip: String in clips:
+		animation_viewer.select_clip(clip)
+		animation_viewer.seek(animation_viewer.duration * 0.5)
+		var count := 1 if clip in ["ocean_swim", "ocean_evacuation"] else 4
+		valid = valid and animation_viewer.clip_id == clip and animation_viewer.panel_maps.size() == count and animation_viewer.panel_viewports.size() == count
+		await get_tree().process_frame
+	animation_viewer.close()
+	return valid and not animation_viewer.visible and simulation.snapshot() == before
+
+
+func _smoke_risk_and_rotation() -> bool:
+	var plan: Layout = simulation.layout.duplicate_layout()
+	var building_id: int = plan.buildings[3].id
+	if not plan.rotate_building(building_id).ok or not plan.set_building_finish(building_id, "roof", "slate").ok:
+		return false
+	var risky := Sim.new()
+	risky.set_price(135)
+	risky.set_swim_policy("allow_red")
+	for i in range(Sim.DAY_LENGTH * 6):
+		if risky.stopped:
+			risky.continue_after_recap()
+		risky.tick()
+		if not risky.ocean_incidents.is_empty():
+			break
+	var resumed := Sim.new()
+	return (risky.booked_price == 135 and risky.ocean_incidents.size() == 1 and risky.reviews.back().score == 0
+		and resumed.restore(risky.snapshot()) and resumed.ocean_incidents == risky.ocean_incidents)
+
+
+func _smoke_new_facilities() -> bool:
+	var tested := 0
+	for kind in Sim.LEISURE_DURATIONS:
+		if kind in Sim.STARTER_LEISURE:
+			continue
+		var trial := Sim.new()
+		trial.set_swim_policy("closed")
+		for prop in trial.layout.landscape.props.duplicate():
+			trial.layout.remove_prop(prop.id)
+		var placed := trial.layout.add_prop(kind, Vector2i(-12, -8), tested % 4)
+		if not placed.ok or trial.layout.amenity_by_id(placed.id).is_empty():
+			return false
+		var visited := false
+		for second in range(Sim.DAY_LENGTH - 1):
+			trial.tick()
+			if trial.families.any(func(family: Dictionary) -> bool: return family.phase == "leisure" and family.leisure_kind == kind):
+				visited = true
+				break
+		if not visited:
+			return false
+		tested += 1
+	return tested == 10
 
 
 func _smoke_landscape() -> bool:

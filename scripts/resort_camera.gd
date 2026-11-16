@@ -6,9 +6,10 @@ signal view_changed(zoom_level: float)
 const ZOOM_STEP := 1.15
 const MAX_ZOOM := 4.0
 const DRAG_THRESHOLD := 5.0
+const Landscape := preload("res://scripts/landscape_model.gd")
 
 var world := Node2D.new()
-var world_bounds := Rect2(-160, -120, 960, 600)
+var world_bounds := Landscape.WORLD_BOUNDS
 var home_center := Vector2(265, 150)
 var home_zoom := 1.8
 var zoom_level := 1.8

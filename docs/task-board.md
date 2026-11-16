@@ -1,6 +1,130 @@
 # Task board
 
-## Delivered revision 8
+## Delivered revision 18
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Saved patch ledger, local arrival deposits, calendar/intensity controls | Systems specialist | Implemented — independent exact-arrival/save checks pass |
+| Lifeguard hiring, assignment, rescue phases and save migration | Systems specialist | Implemented — independent natural/drill phase continuations pass |
+| Developer Beach controls and Staff hiring/coverage UI | UI integrator | Complete — routed359/359 plus UI/modal/construction regressions |
+| Ocean/local pile and lifeguard seated/swim/tow visuals | Root | Accepted — final production-command artifacts and128 renderer checks |
+| Independent review, regression, versioned Windows package | Root + PM | Complete — extended standalone and four-entry archive/hash verified |
+
+See `revision-18.md` and `revision-18-validation.md`. Both Sol/xhigh specialists finished; source/docs frozen. No desktop use or publication. Current executable `build/windows-r18/AllInclusive.exe`: **111,634,904 bytes**, SHA-256 `A44F4C7F7072E815ACD79BAD9E6DAABAE6AF4B89A93131D7BD473C2CBAA4CC32`. Current ZIP: **41,546,552 bytes**, SHA-256 `950872526CF857361DFC65E4AD97C6A157AD9A3BBA4750FDA1FE46DBF4456B92`. Older running builds preserved.
+
+## Earlier revision 17 (superseded artifact)
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Seasonal offshore drift and ocean-clipped patch rendering | Root | Complete — deterministic calendar batches and generated visual review |
+| Swim buoys matching actual lane/wade geometry | Root | Complete — current layout access, all eight targets and wet routes |
+| Independent season/containment regression | Systems reviewer | Accepted — 60/60, seasonal/save/cleanup/draw dispatch coverage |
+| Visual review, Windows candidate and archive | Root + PM | Complete — clean standalone and four-entry archive/hash verification |
+
+See `revision-17.md` and `revision-17-validation.md`. One reviewer only; no production edits by PM/reviewer and no desktop use. Current executable is `build/windows-r17/AllInclusive.exe`; older running builds remain untouched.
+
+Executable **111,605,920 bytes**, SHA-256 `ACCAF8739A9EE024FABB3240A75ECB43D1A4E3710253ED35937C79626A3C589B`. Current ZIP **41,516,976 bytes**, SHA-256 `0888C0F804E39850CC1C5785F9F61CACA16FED0E0071C66D3675688D1FBFC549`. Reviewer finished; source/docs frozen.
+
+## Earlier revision 16 (superseded artifact)
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Separate screen interface from world drawing canvas | Root | Complete — actual canvas isolation 68/68 |
+| Correct welcome text/button spacing | Root | Complete — actual font bounds and button nonoverlap at three resolutions |
+| Independent source review and evidence record | PM | Accepted — hierarchy, canvas contract and regression inspected |
+| Versioned Windows export/archive | Root | Complete — clean standalone and matching archived executable |
+
+See `revision-16.md` and `revision-16-validation.md`. No specialists or desktop use; source/docs frozen. **Current executable: `build/windows-r16/AllInclusive.exe`**, **111,599,744 bytes**, SHA-256 `C26F8C7CA9BA5D73715736B9FC0C46731CFB28A3156EB6CBD0C65D9108A4D4AD`. Current ZIP `build/AllInclusive-Windows.zip`: **41,510,628 bytes**, SHA-256 `A1821CBE30E87E8D3E8363F45A0469DB29564D8C81EC6906F6581317007E13C7`. Four-entry archive and sidecar verified; running older builds untouched.
+
+## Earlier revision 15 (superseded artifact)
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Shared production depth/occlusion and rotated static-art audit | Visual + root core furniture | Complete — cached semantic layers and actual world/viewer dispatch |
+| Independent all-kind/rotation/phase semantic audit | Systems specialist | Complete — 2,484/2,484 over 68 configurations, 476 full + 68 single samples |
+| Generated screenshot-case and broad visual evidence | Team | Accepted — exact 5.47, static atlas, 168 outdoor and rotated core frames |
+| Integration regressions and versioned Windows package | Root + PM | Complete — standalone exit 0 and matching archived executable |
+
+See `revision-15.md` and `revision-15-validation.md`. Source frozen and specialists released. No viewer-only masking, new catalog or desktop use. Remaining synchronized crowdspacing is explicitly documented, not claimed fixed.
+
+Historical executable: `build/windows-r15/AllInclusive.exe`, **111,599,600 bytes**, SHA-256 `81D2E6D65068EF8FEA26D5D05A477600DDA08E4F892256360538C1AE1678EE45`. Historical ZIP: **41,510,347 bytes**, SHA-256 `1133DA631A294C5A9D4022B4ABFC7FD15E1E8458AF551E0475C2C95B7FAEE031`, backed up at `.tools/releases/AllInclusive-r15-depth-Windows.zip`. R16 corrects the world/UI ordering regression while preserving the world depth changes. No Git publication.
+
+## Earlier revision 14 (superseded artifact)
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Runtime four-rotation viewer and animation controls | Visual specialist | Complete — 20 clips, runtime renderer, focused 304 |
+| Independent viewer contract review/tests | Systems specialist | Complete — 852/852 and actual draw callbacks, no pixel claims |
+| Welcome/Settings/F8 entry and modal state preservation | Root | Complete — routed 42 and UI geometry 2,075 |
+| Windows candidate and archive | Root + PM | Complete — clean standalone, exact archived executable hash |
+
+See `revision-14.md` and `revision-14-validation.md`. Both specialists released; source frozen. No animation redesign or CPU renderer substitute; headless/file checks only.
+
+Historical executable: `build/windows-r14/AllInclusive.exe`, **111,569,336 bytes**, SHA-256 `EA1EED17744BA79C32B5FB1DEEE1F83502F0D32286651C298628940E2D96A8DD`. Historical ZIP: **41,480,125 bytes**, SHA-256 `CADBFB962278240AC0A5824B817D03A29B9A0B244C62C4293B7CAEAD2E2F22B2`, backed up at `.tools/releases/AllInclusive-r14-viewer-Windows.zip`. The running R13 executable at `build/windows` was left untouched; its launch note remains R13.
+
+## Earlier revision 13 (running artifact preserved)
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Expanded bounds, preserved old terrain/coast and usable navigation | World specialist | Complete — 50/50 with exact old-region hash preservation |
+| Full editable Developer showcase and real guest coverage | Systems specialist | Complete — 85/85, all fourteen activities completed by Day 3 |
+| New-run integration, camera framing and independent acceptance | Root | Complete — routed 59/59, no old-save population |
+| Generated overview and regression | Team | Accepted — clear venue campus and clean compatibility/shared-pose checks |
+| Windows executable/archive | Root | Complete — clean standalone and matching canonical/archived executable |
+
+See `revision-13.md` and `revision-13-validation.md`. Historical package: **41,454,331 bytes**, SHA-256 `6C6F78E70EF9FA8A3475B0CACCCE77CFA46699A2DDBC7D43A75B7C417B7E3F82`, backed up at `.tools/releases/AllInclusive-r13-showcase-Windows.zip`. Preserved running executable: `build/windows/AllInclusive.exe`, **111,543,400 bytes**, SHA-256 `69EEB717DFABD969FDE545D4902A7640F5A09976538302DE79E19F8CF63CC5F9`. R13 features remain in the current versioned R14 build; all new changes remain local.
+
+## Earlier revision 12 (superseded artifact)
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Verify mirrored destination semantics against exact engine source | Root + PM | Complete — extra origin shift confirmed |
+| Correct shared actor flip and CPU probe/bounds semantics | Root | Complete — facing regression 75/75 after 25 baseline failures |
+| Review actual before/after and shared-pose regressions | Root + PM | Accepted — corrected head/chair alignment and clean focused suites |
+| Standalone Windows/archive verification | Root | Complete — standalone exit 0; canonical/embedded executable hashes match |
+
+See `revision-12.md` and `revision-12-validation.md`. No new specialist or native tester; no desktop use or Git publication. All earlier features remain.
+
+Historical package: **41,380,909 bytes**, SHA-256 `2BFDE992E9FABE11E0244202201776EE0B6AA83A30CFC813EF2434FC6EC95232`. Executable: **111,469,824 bytes**, SHA-256 `E624AC93EEBB67FDF5124BB34A5C0D56FC1D69004E7FDF0786674FD63D8C1343`. Backup: `.tools/releases/AllInclusive-r12-facing-Windows.zip`. Mirrored actor correction remains in R13.
+
+## Earlier revision 11 (superseded source)
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Reproduce screenshot and atlas scaling defect | Root + PM + specialist | Confirmed — adult/child crops vertically compressed |
+| Native seated poses, spacing and shared-resting correction | One visual/core specialist | Complete — focused 49 and dining/shared-activity regressions pass |
+| Independent proportion tests and generated before/after review | Root + PM | Complete — 375/375 and actual all-four table composition accepted |
+| Corrected Windows executable/archive | Specialist + root | Complete — standalone exit 0, canonical/archived hash match |
+
+Historical R11 package: **41,380,885 bytes**, SHA-256 `4776C5A0B3330C0457C5CC5C4D562EB60850295FC436C94E3718859C1C3C4389`. Executable: **111,469,840 bytes**, SHA-256 `6A54FEFB80D900207505E81E76582DE7E32BF6F9531E8737B691FE03FE805DC6`. See `revision-11.md` and `revision-11-validation.md`. Its proportion/seating improvements remain; R12 corrects an additional mirrored-origin defect concealed by the earlier CPU probe. New changes remain local; native playtesting is deferred.
+
+## Delivered revision 9 (combined with R10)
+
+| Task | Owner | State | Contract / evidence |
+| --- | --- | --- | --- |
+| Scope, calendar and seasonal research | PM + root | Complete | Calendar two-year invariant sweep and independent R9 210 pass |
+| Rotation, connected units, exterior settings | Core + visual | Complete | Actual shared-door routes, group transforms and draft exterior preview; routed 24 |
+| Swimming, seasonal beach conditions and pricing | Core + visual | Complete | Persisted risk/accumulation/booked price; six-day policy replay and 31-day season tests |
+| Activity texture and orientation corrections | Visual | Complete | R9 visual 133 plus renderer/dining/beach suites; corrected previews accepted by PM/root |
+| Regression, generated previews and Windows package | Specialists + root + PM | Complete | Legacy saves, extended source/standalone smoke and final combined package verified |
+
+See `revision-9.md` and `revision-9-validation.md`. The final combined R9/R10 Windows package is verified below.
+
+## Earlier revision 10 (superseded artifact)
+
+R9 and the ten-kind catalog in `revision-10.md` are delivered together. Core implemented catalog/itinerary/UI/save/export; visual supplied art/poses/four-way QA; root verified independent facility contracts and packaging. Both specialists are finished and production is frozen. All new work remains local.
+
+| Task | Owner | State |
+| --- | --- | --- |
+| Catalog, costs, groups and ownership contract | PM + root | Complete |
+| Actual venue participation, editing and save support | Core | Complete — routed 79, independent 1,395, expanded source smoke |
+| Four-way venue art and grounded activity animations | Visual | Complete — full-capacity/orientation 1,078 with preview |
+| Independent all-kind behavior and generated preview acceptance | Root + PM | Complete — functional contracts and corrected images accepted |
+| Combined R9/R10 Windows executable and archive | Core + root | Complete — standalone exit 0 and archived executable hash verified |
+
+Historical package: **41,380,445 bytes**, SHA-256 `61FDD6C1F15936F799033E16D02ED466EF37BCDEBB4FCA59D91FCC5467677593`. Executable: **111,469,712 bytes**, SHA-256 `1815D813B5CA8DFEBDFE8EE6DBB34DC5D99447A7C59081DD2E5D1234B73F12D0`. See `revision-10-validation.md`; backup `.tools/releases/AllInclusive-r10-seasons-activities-Windows.zip`. The feature scope remains in current R11, with corrected seating presentation. No native playtesting or new Git push/release.
+
+## Earlier revision 8 (superseded artifact)
 
 | Task | Owner | State | Contract / evidence |
 | --- | --- | --- | --- |
@@ -9,7 +133,7 @@
 | Independent consistency and routed UI checks | Root + integrator | Complete | Independent 137 and routed 610 including geometry; paid/free transactions, saved draft, occupied bar queue/reload/Day 2 removal |
 | Local Windows package | Integrator + root | Complete | Source/portable smoke and matching archived executable; no model/simulation/schema change |
 
-Current package: `build/AllInclusive-Windows.zip`, 41,302,336 bytes, SHA-256 `28EC2E5CF5CAF90028081FB717C77CF05CF7327A5A84DBAF6E2FDD7D7ADCAF8D`. Executable: 111,390,616 bytes, SHA-256 `D0E9742C8AA834279DAF374D99EC31AFBC613E9C120FA4AF19906EE74DB08624`. See `revision-8.md` and `revision-8-validation.md`. Integrator finished; production frozen. No native playtesting or new GitHub release.
+Historical package: 41,302,336 bytes, SHA-256 `28EC2E5CF5CAF90028081FB717C77CF05CF7327A5A84DBAF6E2FDD7D7ADCAF8D`. Executable: 111,390,616 bytes, SHA-256 `D0E9742C8AA834279DAF374D99EC31AFBC613E9C120FA4AF19906EE74DB08624`. See `revision-8.md` and `revision-8-validation.md`; backup `.tools/releases/AllInclusive-r8-consistent-construction-Windows.zip`. Its source was pushed as baseline `37e2520` before R9; current R9/R10 source remains local.
 
 ## Earlier revision 7 (superseded artifact)
 

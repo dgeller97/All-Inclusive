@@ -146,7 +146,7 @@ func _test_settings() -> void:
 	await _choose_finish("floor", "wood")
 	await _choose_finish("wall", "brick")
 	await _choose_finish("ceiling", "beams")
-	_check(lobby.finishes == {"floor": "wood", "wall": "brick", "ceiling": "beams"}
+	_check(lobby.finishes == {"floor": "wood", "wall": "brick", "ceiling": "beams", "facade": "default", "roof": "default"}
 		and _rendered_building(lobby.id).finishes == lobby.finishes
 		and "Cost $30" in ui._quote.text and game.map.ceiling_id == -1,
 		"Final floor, wall, and ceiling choices quote $30 once without auto-opening the ceiling")
@@ -191,7 +191,7 @@ func _test_save_and_apply() -> void:
 	var draft := game.design.draft
 	var lobby := _building(draft, "reception")
 	ui = game.design_ui
-	_check(lobby.display_name == "2Palm 123r" and lobby.finishes == {"floor": "wood", "wall": "brick", "ceiling": "beams"}
+	_check(lobby.display_name == "2Palm 123r" and lobby.finishes == {"floor": "wood", "wall": "brick", "ceiling": "beams", "facade": "default", "roof": "default"}
 		and _building(draft, "buffet").display_name == "Tide 2" and ui._apply.text == "Apply tomorrow"
 		and "Cost $30" in ui._quote.text, "Reopened draft restores both names, materials, and the safe queued quote")
 	_click_button(ui._apply)

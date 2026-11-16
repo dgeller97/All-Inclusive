@@ -95,13 +95,14 @@ func _initialize() -> void:
 	var mixed_cell := Vector2i.ZERO
 	var dry_pixel := Vector2.ZERO
 	var wet_pixel := Vector2.ZERO
-	for row in range(600):
+	for row in range(shoreline.get_height()):
 		var encoded := shoreline.get_pixel(0, row)
-		var shore_x := -160 + encoded.r8 + (encoded.g8 << 8)
+		var shore_x := Landscape.WORLD_ORIGIN.x + encoded.r8 + (encoded.g8 << 8)
 		if posmod(shore_x, 8) in [2, 3, 4, 5, 6]:
-			mixed_cell = Vector2i(floor(float(shore_x) / 8), floor(float(row - 120) / 8))
-			dry_pixel = Vector2(shore_x - 1, row - 120)
-			wet_pixel = Vector2(shore_x, row - 120)
+			var y := Landscape.WORLD_ORIGIN.y + row
+			mixed_cell = Vector2i(floor(float(shore_x) / 8), floor(float(y) / 8))
+			dry_pixel = Vector2(shore_x - 1, y)
+			wet_pixel = Vector2(shore_x, y)
 			break
 	var coast_edit: Layout = active.duplicate_layout()
 	check(not coast_edit.landscape.is_water_pixel(dry_pixel) and coast_edit.landscape.is_water_pixel(wet_pixel), "Original curved coast retains exact pixel land/water boundary")
@@ -142,7 +143,7 @@ func _initialize() -> void:
 	for prop in isolated.landscape.props.duplicate():
 		isolated.remove_prop(prop.id)
 	var barrier: Array = []
-	for x in range(-20, 100):
+	for x in range(Landscape.REGION.position.x, Landscape.REGION.end.x):
 		if isolated.landscape.cell_is_dry(Vector2i(x, 32)):
 			barrier.append(Vector2i(x, 32))
 	check(isolated.paint_landscape_stroke("path", "", barrier).ok, "Erase paths across a dry-land row")

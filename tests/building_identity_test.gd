@@ -42,7 +42,7 @@ func _initialize() -> void:
 	check(draft.readiness() == active.readiness() and draft.route(Layout.ENTRY, draft.station_point(1)) == active.route(Layout.ENTRY, active.station_point(1)), "Appearance changes preserve capacity and navigation")
 	var restored := Layout.new()
 	check(restored.restore(JSON.parse_string(JSON.stringify(draft.snapshot()))), "Names and finishes JSON round trip")
-	check(restored.building_by_id(id).display_name == "A".repeat(24) and restored.building_by_id(id).finishes == {"floor": "stone", "wall": "brick", "ceiling": "beams"}, "All independent finish selections and name survive save")
+	check(restored.building_by_id(id).display_name == "A".repeat(24) and restored.building_by_id(id).finishes == draft.building_by_id(id).finishes, "All independent finish selections and name survive save")
 	var good := restored.buildings.duplicate(true)
 	for corruption in ["missing", "unknown", "bad_name", "pool"]:
 		var bad := draft.snapshot()

@@ -48,11 +48,13 @@ func _test_build_and_use() -> void:
 	game.ui.close_panel()
 	_click(game.ui._dock_buttons.design.get_global_rect().get_center())
 	_click(game.design_ui._category_buttons.facilities.get_global_rect().get_center())
-	for kind in Sim.LEISURE_DURATIONS:
-		var button: Button = game.design_ui._tool_buttons[kind]
-		var price: Label = button.get_node("Price")
-		_check(button.visible and price.visible and "$" in price.text and "families" in button.tooltip_text,
-			"%s has a visible build tool, cost and capacity" % kind)
+	for group in Layout.Landscape.FACILITY_GROUPS:
+		_click(game.design_ui._facility_group_buttons[group].get_global_rect().get_center())
+		for kind in Layout.Landscape.FACILITY_GROUPS[group]:
+			var button: Button = game.design_ui._tool_buttons[kind]
+			var price: Label = button.get_node("Price")
+			_check(button.visible and price.visible and "$" in price.text and "famil" in button.tooltip_text,
+				"%s has a visible build tool, cost and capacity" % kind)
 	var bar: Dictionary = sim.layout.amenities("beach_bar")[0]
 	_click(game.camera.world_to_screen(bar.rect.get_center()))
 	_check(game.design.selection.get("id") == bar.id and not game.design_ui._move.disabled, "Amenities can be selected and moved in Build")

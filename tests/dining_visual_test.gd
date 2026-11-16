@@ -31,6 +31,16 @@ class ActorProbe extends "res://scripts/resort_map.gd":
 				patch.fill(color)
 				picture.blend_rect(patch, Rect2i(Vector2i.ZERO, size), position)
 
+	func _actor_texture(texture: Texture2D, at: Vector2) -> void:
+		if picture:
+			var pixels_image := texture.get_image()
+			pixels_image.convert(Image.FORMAT_RGBA8)
+			picture.blend_rect(pixels_image, Rect2i(Vector2i.ZERO, pixels_image.get_size()), Vector2i(at) - WORLD.position)
+
+	func _actor_flag(_prop: Dictionary) -> void:
+		# The meal probe records texture and actor commands, outside the engine draw callback.
+		pass
+
 	func _actor_region(destination: Rect2, source: Rect2) -> void:
 		sprite_regions.append(destination)
 		if picture:
@@ -42,7 +52,6 @@ class ActorProbe extends "res://scripts/resort_map.gd":
 			var point := Vector2i(destination.position) - Vector2i(WORLD_BOUNDS.position)
 			if destination.size.x < 0:
 				frame.flip_x()
-				point.x -= frame.get_width()
 			picture.blend_rect(frame, Rect2i(Vector2i.ZERO, frame.get_size()), point)
 
 	func clear_marks() -> void:
@@ -140,8 +149,9 @@ func _test_meal(sim: Sim, samples: Dictionary) -> void:
 	_check(map.has_color(map.CHAIR_WOOD) and map.has_color(map.FOOD)
 		and bounds.has_point(eating.adult_plate) and bounds.has_point(eating.child_plate)
 		and eating.adult_plate != eating.child_plate, "Scene draws seats and two filled plates on the tabletop")
-	_check(map.sprite_regions.any(func(rect: Rect2) -> bool: return rect.size.y == 10)
-		and map.sprite_regions.any(func(rect: Rect2) -> bool: return rect.size.y == 7), "Both seated silhouettes crop out standing legs and lower to the chair")
+	_check(map.sprite_regions.any(func(rect: Rect2) -> bool: return rect.size.abs() == Vector2(11, 16))
+		and map.sprite_regions.any(func(rect: Rect2) -> bool: return rect.size.abs() == Vector2(11, 12)),
+		"Both seated silhouettes keep native upper-body dimensions")
 	var before := map.pixels.duplicate(true)
 	map.present(sim, map.time + 0.6)
 	map._draw_actors()

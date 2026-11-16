@@ -80,6 +80,13 @@ class Canvas {
     }
   }
 
+  blit(source, x, y) {
+    const stride = source.width * 4;
+    for (let row = 0; row < source.height; row++) {
+      source.data.copy(this.data, ((y + row) * this.width + x) * 4, row * stride, (row + 1) * stride);
+    }
+  }
+
   save(filename) {
     const header = Buffer.alloc(13);
     header.writeUInt32BE(this.width, 0);
@@ -135,23 +142,29 @@ const darkGreen = '#365e53';
 const leaf = '#679f5b';
 const newLeaf = '#8fb867';
 
-const world = {left: -160, top: -120, width: 960, height: 600};
+const legacyWorld = {left: -160, top: -120, width: 960, height: 600};
+const world = {left: -480, top: -240, width: 1280, height: 960};
 const grid = 8;
-const gridWidth = world.width / grid;
-const gridHeight = world.height / grid;
 const shorelineAnchors = [
   [-120, 386], [-98, 403], [-70, 425], [-36, 451], [0, 471], [43, 490],
   [80, 508], [114, 513], [146, 510], [180, 502], [215, 497], [248, 484],
   [282, 468], [315, 449], [349, 429], [391, 407], [432, 391], [479, 382],
 ];
+const northernCoast = [
+  [-240, 320], [-205, 331], [-175, 346], [-149, 364], ...shorelineAnchors.slice(0, 2),
+];
+const southernCoast = [
+  ...shorelineAnchors.slice(-2), [508, 380], [548, 367], [593, 347],
+  [633, 343], [677, 353], [719, 374],
+];
 
-function shorelineX(y) {
-  const right = shorelineAnchors.findIndex(([row]) => row > y);
-  if (right < 0) return shorelineAnchors.at(-1)[1];
-  const [y1, x1] = shorelineAnchors[right - 1];
-  const [y2, x2] = shorelineAnchors[right];
-  const [y0, x0] = shorelineAnchors[Math.max(0, right - 2)];
-  const [y3, x3] = shorelineAnchors[Math.min(shorelineAnchors.length - 1, right + 1)];
+function shorelineX(y, anchors) {
+  const right = anchors.findIndex(([row]) => row > y);
+  if (right < 0) return anchors.at(-1)[1];
+  const [y1, x1] = anchors[right - 1];
+  const [y2, x2] = anchors[right];
+  const [y0, x0] = anchors[Math.max(0, right - 2)];
+  const [y3, x3] = anchors[Math.min(anchors.length - 1, right + 1)];
   const span = y2 - y1;
   const t = (y - y1) / span;
   const t2 = t * t;
@@ -162,20 +175,27 @@ function shorelineX(y) {
     + (-2 * t3 + 3 * t2) * x2 + (t3 - t2) * endSlope);
 }
 
-const coast = Array.from({length: world.height}, (_, row) => shorelineX(world.top + row));
+const legacyCoast = Array.from({length: legacyWorld.height}, (_, row) => shorelineX(legacyWorld.top + row, shorelineAnchors));
+const coast = Array.from({length: world.height}, (_, row) => {
+  const y = world.top + row;
+  if (y < legacyWorld.top) return shorelineX(y, northernCoast);
+  if (y >= legacyWorld.top + legacyWorld.height) return shorelineX(y, southernCoast);
+  return legacyCoast[y - legacyWorld.top];
+});
 
-function ground(canvas) {
-  for (const [row, shore] of coast.entries()) {
-    const y = world.top + row;
-    const swell = Math.round(Math.sin(row * 0.025) * 8 + Math.sin(row * 0.057) * 3);
-    const dune = Math.round(Math.cos(row * 0.018) * 8 + Math.sin(row * 0.06) * 4);
+function paintShore(canvas, profile) {
+  for (const [row, shore] of profile.entries()) {
+    const y = canvas.top + row;
+    const phase = y - legacyWorld.top;
+    const swell = Math.round(Math.sin(phase * 0.025) * 8 + Math.sin(phase * 0.057) * 3);
+    const dune = Math.round(Math.cos(phase * 0.018) * 8 + Math.sin(phase * 0.06) * 4);
     const yard = shore - 34 + dune;
     const wash = shore + 8;
     const shoal = shore + 25 + swell;
     const reef = shore + 60 + swell * 2;
     const bay = shore + 116 + swell * 2;
     const deep = shore + 193 + swell * 3;
-    canvas.rect(world.left, y, yard - world.left, 1, earth);
+    canvas.rect(canvas.left, y, yard - canvas.left, 1, earth);
     canvas.rect(yard, y, shore - yard - 4, 1, '#f5d8a2');
     canvas.rect(shore - 4, y, 4, 1, '#e7c99a');
     canvas.rect(shore, y, wash - shore, 1, '#a5cdb6');
@@ -183,8 +203,12 @@ function ground(canvas) {
     canvas.rect(shoal, y, reef - shoal, 1, '#63b1aa');
     canvas.rect(reef, y, bay - reef, 1, '#529fa5');
     canvas.rect(bay, y, deep - bay, 1, '#478b9b');
-    canvas.rect(deep, y, world.left + world.width - deep, 1, '#427f94');
+    canvas.rect(deep, y, canvas.left + canvas.width - deep, 1, '#427f94');
   }
+}
+
+function legacyGround(canvas) {
+  paintShore(canvas, legacyCoast);
   canvas.polygon([[-160, -120], [313, -120], [339, -95], [346, -62], [380, -40], [392, -13], [380, 24], [370, 47], [326, 51], [271, 29], [177, 26], [114, 31], [66, 25], [25, 51], [0, 81], [-31, 94], [-53, 126], [-56, 166], [-98, 211], [-105, 255], [-81, 296], [-105, 329], [-141, 339], [-160, 339]], '#b8bb75');
   canvas.polygon([[-160, -120], [218, -120], [267, -102], [289, -72], [283, -30], [285, 0], [261, 12], [145, 11], [101, 24], [57, 18], [0, 53], [-41, 65], [-68, 105], [-67, 147], [-102, 180], [-118, 220], [-120, 259], [-160, 294]], '#94aa68');
   canvas.polygon([[-160, -92], [-124, -97], [-92, -82], [-39, -87], [5, -110], [81, -120], [134, -120], [149, -108], [108, -91], [49, -78], [17, -62], [-17, -37], [-69, -24], [-100, 17], [-119, 42], [-160, 50]], '#829c63');
@@ -193,12 +217,12 @@ function ground(canvas) {
   canvas.polygon([[151, 314], [177, 322], [204, 347], [258, 364], [291, 395], [274, 425], [248, 439], [224, 479], [83, 479], [91, 445], [127, 400], [117, 355]], '#a6ae6d');
   canvas.polygon([[178, 269], [213, 255], [316, 252], [347, 274], [373, 277], [394, 293], [405, 310], [381, 321], [349, 311], [307, 314], [284, 298], [248, 299], [219, 284], [194, 287]], '#d1bb79');
   const materials = defaultMaterials(canvas);
-  terrainTexture(canvas);
-  wetSandTexture(canvas);
+  terrainTexture(canvas, legacyCoast, 6900, 1600);
+  wetSandTexture(canvas, legacyCoast, 100);
   return materials;
 }
 
-function terrainTexture(canvas) {
+function terrainTexture(canvas, profile, landFlecks, waterGlints) {
   const textures = new Map([
     [earth, ['#ecc69a', '#d7a97e']],
     ['#f5d8a2', ['#f9dfad', '#edc98e']],
@@ -209,21 +233,21 @@ function terrainTexture(canvas) {
     ['#b6b777', ['#c3be80', '#a9ab6c']],
     ['#a6ae6d', ['#b3b67a', '#9ba568']],
   ].map(([base, colors]) => [Buffer.from(hex(base)).readUInt32BE(), colors]));
-  for (let index = 0; index < 6900; index++) {
-    const row = randomInt(world.height);
-    const col = randomInt(coast[row] - world.left - 7);
-    const offset = (row * world.width + col) * 4;
+  for (let index = 0; index < landFlecks; index++) {
+    const row = randomInt(canvas.height);
+    const col = randomInt(profile[row] - canvas.left - 7);
+    const offset = (row * canvas.width + col) * 4;
     const colors = textures.get(canvas.data.readUInt32BE(offset));
-    if (colors) canvas.rect(world.left + col, world.top + row, 1 + randomInt(4), 1, colors[Number(index % 4 === 0)]);
+    if (colors) canvas.rect(canvas.left + col, canvas.top + row, 1 + randomInt(4), 1, colors[Number(index % 4 === 0)]);
   }
-  for (let index = 0; index < 1600; index++) {
-    const row = randomInt(world.height);
-    const x = coast[row] + 9 + randomInt(world.left + world.width - coast[row] - 9);
-    const y = world.top + row;
-    const tint = x - coast[row] < 45 ? [195, 224, 190, 82] : [160, 210, 204, 52];
+  for (let index = 0; index < waterGlints; index++) {
+    const row = randomInt(canvas.height);
+    const x = profile[row] + 9 + randomInt(canvas.left + canvas.width - profile[row] - 9);
+    const y = canvas.top + row;
+    const tint = x - profile[row] < 45 ? [195, 224, 190, 82] : [160, 210, 204, 52];
     const length = 1 + randomInt(8);
-    for (let offset = 0; offset < length && x + offset < world.left + world.width; offset++) {
-      const pixel = (row * world.width + x + offset - world.left) * 4;
+    for (let offset = 0; offset < length && x + offset < canvas.left + canvas.width; offset++) {
+      const pixel = (row * canvas.width + x + offset - canvas.left) * 4;
       const alpha = tint[3] / 255;
       const base = canvas.data;
       canvas.pixel(x + offset, y, [0, 1, 2].map(channel => Math.round(base[pixel + channel] * (1 - alpha) + tint[channel] * alpha)).concat(255));
@@ -238,11 +262,13 @@ const materialColors = new Map([
 ].flatMap(([material, colors]) => colors.map(color => [Buffer.from(hex(color)).readUInt32BE(), material])));
 
 function defaultMaterials(canvas) {
+  const gridWidth = canvas.width / grid;
+  const gridHeight = canvas.height / grid;
   const defaults = new Canvas(gridWidth, gridHeight);
   for (let row = 0; row < gridHeight; row++) {
     for (let col = 0; col < gridWidth; col++) {
       const center = [col * grid + grid / 2, row * grid + grid / 2];
-      const offset = (center[1] * world.width + center[0]) * 4;
+      const offset = (center[1] * canvas.width + center[0]) * 4;
       const material = materialColors.get(canvas.data.readUInt32BE(offset)) ?? 4;
       defaults.pixel(col, row, [material, 0, 0, 255]);
     }
@@ -250,13 +276,98 @@ function defaultMaterials(canvas) {
   return defaults;
 }
 
-function wetSandTexture(canvas) {
-  for (let index = 0; index < 100; index++) {
-    const y = world.top + 6 + randomInt(world.height - 12);
-    const x = coast[y - world.top] - 10 - randomInt(15);
+function wetSandTexture(canvas, profile, flecks) {
+  for (let index = 0; index < flecks; index++) {
+    const y = canvas.top + 6 + randomInt(canvas.height - 12);
+    const x = profile[y - canvas.top] - 10 - randomInt(15);
     if (y >= 112 && y <= 158) continue;
     canvas.rect(x, y, 2 + randomInt(3), 1, '#e5c38f');
     canvas.pixel(x + 1, y - 1, index % 5 === 0 ? '#d6a981' : '#f9e2b1');
+  }
+}
+
+function expandedGround(canvas) {
+  paintShore(canvas, coast);
+  canvas.polygon([
+    [-480, -240], [263, -240], [291, -186], [320, -126], [303, -65], [260, -39],
+    [156, -11], [18, 36], [-39, 116], [-68, 162], [-86, 236], [-114, 279],
+    [-156, 332], [-233, 366], [-308, 378], [-413, 427], [-480, 419],
+  ], '#b8bb75');
+  canvas.polygon([
+    [-480, -240], [179, -240], [206, -211], [217, -157], [176, -97], [48, -57],
+    [-43, 2], [-92, 92], [-124, 162], [-159, 219], [-236, 243], [-322, 250],
+    [-402, 292], [-480, 309],
+  ], '#94aa68');
+  canvas.polygon([
+    [-480, -240], [-118, -240], [-91, -215], [-139, -177], [-191, -148],
+    [-230, -90], [-286, -37], [-355, -24], [-407, 7], [-480, 29],
+  ], '#829c63');
+  canvas.polygon([
+    [-480, 109], [-409, 108], [-351, 82], [-275, 81], [-229, 125],
+    [-238, 179], [-290, 214], [-389, 210], [-453, 239], [-480, 218],
+  ], '#a8b36e');
+  canvas.polygon([
+    [-480, 425], [-401, 405], [-340, 370], [-297, 376], [-239, 351], [-177, 359],
+    [-111, 389], [-76, 424], [9, 456], [46, 495], [58, 537], [34, 580],
+    [51, 624], [104, 655], [123, 719], [-480, 719],
+  ], '#a8b36e');
+  canvas.polygon([
+    [-480, 537], [-407, 491], [-336, 475], [-261, 502], [-200, 510],
+    [-144, 562], [-128, 616], [-95, 659], [-63, 719], [-480, 719],
+  ], '#94aa68');
+  canvas.polygon([
+    [-480, 634], [-424, 602], [-358, 594], [-284, 617], [-250, 655],
+    [-279, 680], [-246, 719], [-480, 719],
+  ], '#829c63');
+  canvas.polygon([
+    [42, 462], [105, 417], [207, 426], [271, 458], [278, 505], [261, 547],
+    [277, 584], [251, 630], [193, 650], [150, 687], [127, 719], [74, 719],
+    [46, 675], [13, 613], [31, 553], [20, 507],
+  ], '#b6b777');
+  canvas.polygon([
+    [108, 467], [156, 440], [230, 455], [245, 494], [225, 540], [239, 590],
+    [196, 612], [148, 592], [124, 543], [95, 506],
+  ], '#a6ae6d');
+  const materials = defaultMaterials(canvas);
+  randomState = 819406;
+  terrainTexture(canvas, coast, 15100, 2600);
+  wetSandTexture(canvas, coast, 160);
+  return materials;
+}
+
+// Continue the old edge colors into the extension. The original pixels are
+// copied afterward, so their texture and the shoreline never move.
+function joinLegacyEdges(terrain, old) {
+  const fade = 34;
+  for (let row = 0; row < terrain.height; row++) {
+    const y = terrain.top + row;
+    const oldY = Math.min(old.top + old.height - 1, Math.max(old.top, y));
+    const oldRow = oldY - old.top;
+    for (let col = 0; col < terrain.width; col++) {
+      const x = terrain.left + col;
+      const oldX = Math.min(old.left + old.width - 1, Math.max(old.left, x));
+      const distance = Math.max(Math.abs(oldX - x), Math.abs(oldY - y));
+      if (distance === 0 || distance >= fade || x >= coast[row] || oldX >= legacyCoast[oldRow]) continue;
+      const blend = 1 - distance / fade;
+      const target = (row * terrain.width + col) * 4;
+      // Average along the old edge so single-pixel flecks end near the seam.
+      const radius = Math.min(8, distance);
+      const color = [0, 0, 0];
+      let count = 0;
+      for (let offset = -radius; offset <= radius; offset++) {
+        const sampleX = oldX + (oldY === y ? 0 : offset);
+        const sampleRow = oldRow + (oldY === y ? offset : 0);
+        if (sampleRow < 0 || sampleRow >= old.height || sampleX < old.left || sampleX >= legacyCoast[sampleRow]) continue;
+        const index = (sampleRow * old.width + sampleX - old.left) * 4;
+        for (let channel = 0; channel < 3; channel++) color[channel] += old.data[index + channel];
+        count++;
+      }
+      for (let channel = 0; channel < 3; channel++) {
+        terrain.data[target + channel] = Math.round(
+          color[channel] / count * blend + terrain.data[target + channel] * (1 - blend),
+        );
+      }
+    }
   }
 }
 
@@ -309,16 +420,76 @@ const palms = [
   [196, 294, 1, 0.8], [292, 279, 1, 0.76],
 ];
 
-function rock(canvas, x, y, rotation) {
-  const facing = [1, 0.75, -1, -0.75][rotation];
-  const points = pairs => pairs.map(([dx, dy]) => [x + Math.round(dx * facing), y + dy]);
-  canvas.oval(x + 1, y + 2, 9, 3, '#b79b7a');
-  canvas.polygon(points([[-7, 1], [-8, -1], [-5, -6], [3, -8], [7, -5], [8, 0], [3, 2]]), '#878477');
-  canvas.polygon(points([[-7, -1], [-4, -5], [3, -7], [6, -5], [1, -2], [-4, 0]]), '#b6a78d');
-  canvas.line(...points([[-4, -5], [1, -6]]).flat(), '#d2bb99');
-  canvas.line(...points([[1, -2], [4, 0]]).flat(), '#a4937e');
+function propProjection(x, y, turn, size = 1) {
+  return (u, v, z = 0) => {
+    const [dx, dy] = [[u, v], [-v, u], [-u, -v], [v, -u]][turn];
+    return [x + Math.round(dx * size), y + Math.round((dy * 0.45 - z) * size)];
+  };
 }
 
+function palmProp(canvas, x, y, size, turn) {
+  const at = propProjection(x, y, turn, size);
+  const base = at(0, 0);
+  const middle = at(2, 1, 15);
+  const crown = at(7, 3, 31);
+  canvas.polygon([[x - 5, y + 1], base, [crown[0] + 26, y - 3],
+    [crown[0] + 31, y], [x + 6, y + 3]], '#b79970');
+  canvas.polygon([[base[0] - 2, base[1]], [base[0] + 2, base[1]],
+    [middle[0] + 2, middle[1]], [crown[0] + 2, crown[1]],
+    [crown[0] - 1, crown[1]], [middle[0] - 2, middle[1]]], '#925f4c');
+  canvas.line(base[0] - 1, base[1] - 1, middle[0] - 1, middle[1], '#d5a275');
+  canvas.line(middle[0] - 1, middle[1], crown[0] - 1, crown[1], '#d5a275');
+  for (const height of [6, 11, 16, 21, 26]) {
+    const weight = height / 31;
+    const point = at(7 * weight * weight, 3 * weight, height);
+    canvas.rect(point[0] - 1, point[1], 3, 1, '#a77958');
+  }
+  const fronds = [
+    [-23, -8, 30, green], [18, -19, 35, leaf], [27, 4, 23, green],
+    [12, 23, 22, darkGreen], [-14, 17, 23, leaf], [-6, -12, 43, newLeaf],
+  ];
+  fronds.sort(([a, b, h], [c, d, j]) => at(a + 7, b + 3, h)[1] - at(c + 7, d + 3, j)[1]);
+  for (const [u, v, height, color] of fronds) {
+    const bend = Math.hypot(u, v);
+    const perpendicular = [-v / bend * 4, u / bend * 4];
+    const mid = (side) => at(7 + u * .55 + perpendicular[0] * side, 3 + v * .55 + perpendicular[1] * side, 37);
+    const tip = at(7 + u, 3 + v, height);
+    canvas.polygon([crown, mid(-1), at(7 + u * .82, 3 + v * .82, height + 4), tip, mid(1)], color);
+    const glint = at(7 + u * .56, 3 + v * .56, 37);
+    canvas.line(...crown, ...glint, color === darkGreen ? green : '#86aa67');
+  }
+  canvas.rect(crown[0] - 1, crown[1], 4, 2, '#6c5645');
+}
+
+function shrubProp(canvas, x, y, turn) {
+  const at = propProjection(x, y, turn);
+  canvas.oval(x, y + 3, 17, 5, '#9da570');
+  const branches = [
+    [-10, -4, 8, '#729358', '#adc076'], [1, 4, 9, '#658854', '#91a963'],
+    [10, -3, 7, '#809b58', '#b3ba74'], [-4, 7, 6, '#729358', '#9eb16a'],
+  ];
+  branches.sort(([a, b], [c, d]) => at(a, b)[1] - at(c, d)[1]);
+  for (const [u, v, width, greenColor, tip] of branches) {
+    const [bx, by] = at(u, v, 2);
+    canvas.oval(bx, by, width, 5, greenColor);
+    canvas.oval(bx - 2, by - 3, width - 3, 2, tip);
+    canvas.pixel(bx, by - 3, '#c8c681');
+  }
+}
+
+function rock(canvas, x, y, turn) {
+  const at = propProjection(x, y, turn, .82);
+  const vertices = [[-8, -4, 0], [0, -8, 1], [8, -4, 0], [9, 4, 0], [-1, 7, 1], [-9, 5, 0]];
+  const high = at(1, -2, 5);
+  canvas.oval(x + 1, y + 2, 9, 3, '#b79b7a');
+  canvas.polygon(vertices.map(point => at(...point)), '#878477');
+  for (let i = 0; i < vertices.length; i++) {
+    const a = at(...vertices[i]);
+    const b = at(...vertices[(i + 1) % vertices.length]);
+    canvas.polygon([a, b, high], ['#b6a78d', '#c9b69a', '#9b9681', '#a4937e', '#878477', '#a69e8a'][(i + turn) % 6]);
+  }
+  canvas.pixel(high[0], high[1], '#d2bb99');
+}
 const palmSizes = [...new Set([1, ...groves.map(palm => palm[3]), ...palms.map(palm => palm[3])])];
 const propCell = 96;
 const propAnchor = [44, 67];
@@ -349,21 +520,10 @@ function landscapePropAtlas() {
   for (let rotation = 0; rotation < 4; rotation++) {
     const x = rotation * propCell + propAnchor[0];
     for (const [variant, size] of palmSizes.entries()) {
-      palm(atlas, x, variant * propCell + propAnchor[1], size, [1, 0.62, -1, -0.62][rotation]);
+      palmProp(atlas, x, variant * propCell + propAnchor[1], size, rotation);
     }
     const bushY = palmSizes.length * propCell + propAnchor[1];
-    const bush = new Canvas(propCell, propCell);
-    shrub(bush, propAnchor[0] + 8, propAnchor[1] - 4);
-    for (let y = propAnchor[1] - 10; y < propAnchor[1] + 10; y++) {
-      for (let col = propAnchor[0] - 23; col < propAnchor[0] + 23; col++) {
-        const pixel = (y * propCell + col) * 4;
-        if (bush.data[pixel + 3] === 0) continue;
-        const dx = col - propAnchor[0];
-        const sideStep = [0, -2, 0, 0][rotation];
-        const bend = [1, 0.75, -1, -0.75][rotation];
-        atlas.pixel(x + sideStep + Math.round(dx * bend), bushY + y - propAnchor[1], bush.data.subarray(pixel, pixel + 4));
-      }
-    }
+    shrubProp(atlas, x, bushY, rotation);
     rock(atlas, x, bushY + propCell, rotation);
   }
   return atlas;
@@ -378,12 +538,12 @@ function connectStarterPaths(defaults, props) {
   function tile(x, y, path) {
     if (occupied.has([x / grid, y / grid].join(','))) return;
     if (startBuildings.some(([l, t, w, h]) => x < l + w && x + grid > l && y < t + h && y + grid > t)) return;
-    for (let row = y - world.top; row < y - world.top + grid; row++) {
-      if (x + grid > coast[row]) return;
+    for (let row = y - legacyWorld.top; row < y - legacyWorld.top + grid; row++) {
+      if (x + grid > legacyCoast[row]) return;
     }
-    const col = (x - world.left) / grid;
-    const row = (y - world.top) / grid;
-    const material = defaults.data[(row * gridWidth + col) * 4];
+    const col = (x - legacyWorld.left) / grid;
+    const row = (y - legacyWorld.top) / grid;
+    const material = defaults.data[(row * defaults.width + col) * 4];
     defaults.pixel(col, row, [material, path, 0, 255]);
   }
   for (let x = 40; x <= 456; x += grid) {
@@ -446,136 +606,129 @@ function landscapeMaterials() {
   return atlas;
 }
 
-// The model owns placement. Atlas cells are 32 × 32, with art at the top left
-// occupying exactly the corresponding model footprint (pixels, rotated as needed).
-const furniture = [
-  [16, 24, (c) => {
-    c.rect(1, 1, 15, 23, [75, 53, 61, 56]);
-    c.rect(0, 0, 14, 22, '#785249');
-    c.rect(1, 0, 12, 3, '#bf815e');
-    c.rect(1, 0, 12, 1, '#e7ad78');
-    c.rect(1, 3, 12, 17, linen);
-    for (const x of [2, 8]) {
-      c.rect(x, 4, 4, 3, '#fffae1');
-      c.rect(x, 7, 4, 1, '#debc9c');
-    }
-    c.rect(1, 9, 12, 11, '#5e9c92');
-    c.rect(1, 9, 12, 1, '#9ec6ab');
-    c.rect(1, 17, 12, 1, '#a6cbb2');
-    c.rect(1, 20, 12, 1, '#426f6e');
-    for (const x of [3, 6, 9]) c.pixel(x, 18, linen);
-    c.pixel(1, 22, '#624b45');
-    c.pixel(12, 22, '#624b45');
-  }],
-  [24, 16, (c) => {
-    c.rect(2, 3, 22, 13, [75, 53, 61, 56]);
-    c.rect(0, 5, 22, 9, '#8f5146');
-    c.rect(1, 8, 20, 4, '#b57554');
-    c.rect(0, 3, 22, 6, '#dba76c');
-    c.rect(0, 3, 22, 1, '#f6cf8b');
-    c.rect(2, 6, 6, 2, linen);
-    c.rect(12, 1, 7, 5, ink);
-    c.rect(13, 2, 5, 3, '#79afaa');
-    c.rect(14, 6, 3, 1, '#86614c');
-    for (const x of [3, 10, 17]) c.rect(x, 10, 3, 1, '#ecb779');
-    c.rect(1, 13, 2, 2, '#654848');
-    c.rect(19, 13, 2, 2, '#654848');
-  }],
-  [32, 16, (c) => {
-    c.rect(2, 4, 30, 12, [75, 53, 61, 56]);
-    c.rect(0, 6, 30, 8, '#945445');
-    c.rect(0, 2, 30, 8, '#d7a477');
-    c.rect(0, 2, 30, 1, '#ffe0a8');
-    c.rect(0, 9, 30, 1, '#82564a');
-    for (const [index, filling] of ['#b66252', '#80a35e', '#e6a154'].entries()) {
-      const x = 2 + index * 9;
-      c.rect(x, 4, 8, 4, '#8b7f6d');
-      c.rect(x, 4, 8, 3, linen);
-      c.rect(x + 1, 5, 6, 2, filling);
-      c.pixel(x + 2, 5, '#f2d08b');
-      c.pixel(x + 5, 6, '#f2d08b');
-      c.rect(x + 1, 11, 6, 1, '#c88863');
-    }
-    c.rect(1, 13, 2, 2, '#704d46');
-    c.rect(27, 13, 2, 2, '#704d46');
-  }],
-  [16, 16, (c) => {
-    c.oval(8, 10, 7, 4, [75, 53, 61, 56]);
-    for (const x of [0, 11]) {
-      c.rect(x, 9, 5, 5, '#814f4b');
-      c.rect(x + 1, 9, 3, 3, '#bf795f');
-      c.rect(x, 13, 5, 1, '#e0a16d');
-    }
-    c.oval(7, 7, 6, 4, '#b27754');
-    c.oval(7, 6, 6, 4, '#f0c996');
-    c.rect(6, 3, 3, 6, '#b36b62');
-    c.rect(3, 6, 2, 1, linen);
-    c.rect(10, 6, 2, 1, linen);
-    c.pixel(7, 4, leaf);
-  }],
-  [8, 24, (c) => {
-    c.rect(1, 3, 7, 21, [75, 53, 61, 56]);
-    c.rect(0, 1, 7, 20, '#955b45');
-    c.rect(0, 0, 7, 19, linen);
-    c.rect(1, 1, 5, 17, '#c17962');
-    c.rect(1, 1, 5, 4, '#dd9d75');
-    for (const row of [6, 10, 14]) c.rect(1, row, 5, 1, '#f4d9a8');
-    c.rect(1, 21, 1, 2, '#77534b');
-    c.rect(5, 21, 1, 2, '#77534b');
-  }],
-  [16, 16, (c, rotation) => {
-    const stripe = ['#c07860', '#769e78', '#c99055', '#8190a5'][rotation];
-    c.oval(9, 12, 6, 2, [75, 53, 61, 56]);
-    c.rect(7, 6, 2, 8, '#a47657');
-    c.rect(7, 6, 1, 7, '#f3c889');
-    c.polygon([[0, 8], [2, 4], [7, 1], [10, 2], [13, 4], [15, 8]], stripe);
-    c.polygon([[3, 8], [7, 1], [6, 8]], '#f6d5a0');
-    c.polygon([[9, 8], [7, 1], [12, 8]], '#f6d5a0');
-    c.rect(0, 8, 16, 1, '#af7756');
-    c.rect(1, 7, 14, 1, '#eed6a1');
-    c.pixel(7, 0, linen);
-  }, true],
-  [8, 8, (c, rotation) => {
-    c.rect(2, 7, 5, 1, [75, 53, 61, 56]);
-    c.polygon([[1, 4], [6, 4], [5, 7], [2, 7]], '#b86d51');
-    c.rect(1, 4, 6, 1, '#e9a174');
-    const leafTip = [3, 4, 2, 5][rotation];
-    c.polygon([[3, 4], [0, 3], [0, 1], [2, 2], [leafTip, 0], [5, 1], [5, 3], [7, 1], [7, 3]], green);
-    c.pixel(leafTip, 1, newLeaf);
-    c.pixel(1, 2, leaf);
-  }, true],
-  [24, 8, (c) => {
-    c.rect(2, 2, 22, 6, [75, 53, 61, 56]);
-    c.rect(1, 0, 21, 3, '#92644f');
-    c.rect(1, 0, 21, 1, '#d39f71');
-    c.rect(0, 3, 23, 3, '#c08a5c');
-    c.rect(0, 3, 23, 1, '#e7bb7b');
-    c.rect(0, 5, 23, 1, '#9e6b56');
-    c.rect(2, 6, 2, 2, '#6d5250');
-    c.rect(19, 6, 2, 2, '#6d5250');
-  }],
-];
-
+// Only the ground plane rotates. Legs, backs and countertop details use
+// vertical projection in screen space at the newly rotated support points.
 function furnitureAtlas() {
-  const size = 32;
-  const atlas = new Canvas(size * 4, size * furniture.length);
-  for (const [row, [width, height, paint, upright]] of furniture.entries()) {
-    for (let rotation = 0; rotation < 4; rotation++) {
-      const piece = new Canvas(width, height);
-      paint(piece, rotation);
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const offset = (y * width + x) * 4;
-          if (piece.data[offset + 3] === 0) continue;
-          const [dx, dy] = upright ? [x, y] : [[x, y], [height - 1 - y, x], [width - 1 - x, height - 1 - y], [y, width - 1 - x]][rotation];
-          atlas.pixel(rotation * size + dx, row * size + dy, piece.data.subarray(offset, offset + 4));
+  const cell = 40;
+  const lift = 6;
+  const sizes = [[16, 24], [24, 16], [32, 16], [16, 16], [8, 24], [16, 16], [8, 8], [24, 8]];
+  const atlas = new Canvas(cell * 4, cell * sizes.length);
+  const outline = '#685049';
+  const wood = '#bf885e';
+  const sun = '#f2c68f';
+  const dark = '#8b5549';
+  const shadow = [55, 38, 48, 52];
+  for (const [row, [w, h]] of sizes.entries()) {
+    for (let turn = 0; turn < 4; turn++) {
+      const ox = turn * cell;
+      const oy = row * cell + lift;
+      const at = (x, y, z = 0) => {
+        const [rx, ry] = [[x, y], [h - 1 - y, x], [w - 1 - x, h - 1 - y], [y, w - 1 - x]][turn];
+        return [ox + rx, oy + ry - z];
+      };
+      const flat = (x, y, width, height, color, z = 0) => {
+        const a = at(x, y, z);
+        const b = at(x + width - 1, y + height - 1, z);
+        atlas.rect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]) + 1,
+          Math.abs(b[1] - a[1]) + 1, color);
+      };
+      const upright = (x, y, width, height, color, z = 0) => {
+        const [px, py] = at(x, y, z);
+        atlas.rect(px - Math.floor(width / 2), py - height + 1, width, height, color);
+      };
+      const rail = (x1, y1, x2, y2, z, height, color) => {
+        for (let dy = 0; dy < height; dy++) {
+          atlas.line(...at(x1, y1, z + dy), ...at(x2, y2, z + dy), color);
         }
+      };
+      const supports = (x, y, width, height, tall) => {
+        for (const sx of [x, x + width - 1]) {
+          for (const sy of [y, y + height - 1]) upright(sx, sy, 2, tall, outline);
+        }
+      };
+      const raised = (x, y, width, height, tall, color) => {
+        flat(x + 1, y + 1, width, height, shadow);
+        supports(x + 1, y + 1, width - 2, height - 2, tall);
+        flat(x, y, width, height, outline, tall - 1);
+        flat(x, y, width, height, dark, tall);
+        flat(x, y, width, height, sun, tall + 1);
+        flat(x + 1, y + 1, width - 2, height - 2, color, tall + 1);
+      };
+      if (row === 0) {
+        raised(1, 1, 14, 22, 2, linen);
+        flat(2, 9, 12, 12, '#5e9c92', 3);
+        flat(2, 9, 12, 1, '#a6cbb2', 3);
+        flat(2, 19, 12, 1, '#83b5a5', 3);
+        for (const x of [3, 9]) {
+          flat(x, 3, 4, 4, '#fff9db', 3);
+          flat(x, 6, 4, 1, '#dfc39f', 3);
+        }
+        rail(1, 1, 14, 1, 4, 4, dark);
+        rail(1, 1, 14, 1, 7, 1, sun);
+      } else if (row === 1 || row === 2) {
+        const tall = 4;
+        raised(1, 2, w - 2, h - 4, tall, wood);
+        rail(2, h - 4, w - 3, h - 4, 1, 3, dark);
+        for (let x = 4; x < w - 4; x += 7) flat(x, h - 4, 3, 1, wood, 2);
+        if (row === 1) {
+          flat(3, 8, 6, 3, linen, tall + 1);
+          const [x, y] = at(15, 6, tall + 1);
+          atlas.rect(x - 1, y - 2, 3, 3, outline);
+          atlas.rect(x - 3, y - 6, 7, 5, outline);
+          atlas.rect(x - 2, y - 5, 5, 3, turn < 2 ? '#79afaa' : '#ac8b79');
+          atlas.pixel(x - 1, y - 5, '#b3d2bd');
+        } else {
+          for (const [index, filling] of ['#b66252', '#80a35e', '#e6a154'].entries()) {
+            const x = 3 + index * 9;
+            flat(x, 6, 8, 5, outline, tall + 1);
+            flat(x + 1, 7, 6, 3, linen, tall + 1);
+            flat(x + 2, 7, 4, 2, filling, tall + 1);
+          }
+        }
+      } else if (row === 3) {
+        raised(1, 2, 14, 12, 2, '#e8b987');
+        flat(1, 6, 14, 4, '#b77172', 3);
+        flat(1, 6, 14, 1, '#edb7a0', 3);
+        flat(7, 7, 2, 2, '#f5d9ab', 4);
+        flat(7, 7, 1, 1, '#83a76e', 5);
+      } else if (row === 4) {
+        raised(1, 1, 6, 22, 1, '#c17962');
+        for (const y of [9, 13, 17]) flat(2, y, 4, 1, linen, 2);
+        rail(1, 2, 6, 2, 3, 3, dark);
+        rail(1, 2, 6, 2, 5, 1, sun);
+      } else if (row === 5) {
+        flat(5, 6, 7, 6, shadow);
+        flat(6, 6, 4, 4, dark);
+        upright(7, 7, 2, 12, outline);
+        upright(7, 7, 1, 12, sun);
+        // The canvas stays above the pole. Its radial panel rotates with the cap.
+        const [x, y] = at(7, 7, 11);
+        atlas.polygon([[ox, y + 5], [ox + 3, y + 1], [x, y - 2], [ox + 12, y + 1], [ox + 15, y + 5]], '#bc6655');
+        const rib = at(11, 7)[0] - ox;
+        atlas.polygon([[x, y - 1], [ox + Math.max(1, rib - 2), y + 5], [ox + Math.min(14, rib + 2), y + 5]], '#f1ce9c');
+        const accent = [2, 10, 4, 12][turn];
+        atlas.rect(ox + accent, y + 4, 3, 2, '#e6a280');
+        atlas.rect(ox, y + 6, 16, 1, dark);
+        atlas.pixel(x, y - 2, linen);
+      } else if (row === 6) {
+        flat(1, 2, 6, 6, shadow);
+        const [x, y] = at(3, 3);
+        atlas.rect(x - 2, y - 2, 5, 4, '#aa6e53');
+        atlas.rect(x - 3, y - 3, 7, 2, '#e0a075');
+        atlas.rect(x, y - 6, 1, 3, '#56764e');
+        const dx = [2, -1, -2, 1][turn];
+        atlas.line(x, y - 5, x + dx, y - 8, '#8eb273');
+        atlas.line(x - 2, y - 7, x + 2, y - 5, '#638d58');
+      } else {
+        raised(1, 2, 22, 5, 2, wood);
+        rail(1, 2, 22, 2, 3, 3, dark);
+        rail(1, 2, 22, 2, 6, 1, sun);
+        rail(2, 3, 21, 3, 3, 1, sun);
       }
     }
   }
   return atlas;
 }
-
 const guests = [
   {skin: '#d5936c', litSkin: '#edb28a', hair: '#4c3642', shirt: '#d3715e', lightShirt: '#ed9774', pants: '#656880', accessory: '#f1cb87'},
   {skin: '#a86d53', litSkin: '#c38765', hair: '#3c323f', shirt: '#64a297', lightShirt: '#93c1a3', pants: '#76515e', accessory: '#e8ab64'},
@@ -656,10 +809,17 @@ function appIcon() {
 
 const people = new Canvas(80, 120);
 const shoreProfile = new Canvas(1, world.height);
-const terrain = new Canvas(world.width, world.height, world.left, world.top);
-const defaults = ground(terrain);
+const oldTerrain = new Canvas(legacyWorld.width, legacyWorld.height, legacyWorld.left, legacyWorld.top);
+const oldDefaults = legacyGround(oldTerrain);
 const startProps = landscapeProps();
-connectStarterPaths(defaults, startProps);
+connectStarterPaths(oldDefaults, startProps);
+const terrain = new Canvas(world.width, world.height, world.left, world.top);
+const defaults = expandedGround(terrain);
+const legacyX = legacyWorld.left - world.left;
+const legacyY = legacyWorld.top - world.top;
+joinLegacyEdges(terrain, oldTerrain);
+terrain.blit(oldTerrain, legacyX, legacyY);
+defaults.blit(oldDefaults, legacyX / grid, legacyY / grid);
 terrain.save('resort.png');
 defaults.save('landscape_defaults.png');
 landscapeMaterials().save('landscape_materials.png');

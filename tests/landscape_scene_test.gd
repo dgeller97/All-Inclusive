@@ -35,7 +35,7 @@ func _run() -> void:
 
 
 func _test_developer() -> void:
-	_start("Developer · Free build")
+	_start("Developer showcase")
 	_use_pre_amenity_fixture()
 	var active: Layout = game.simulation.layout
 	_open_landscape()
@@ -328,13 +328,14 @@ func _test_protected_save() -> void:
 
 
 func _use_pre_amenity_fixture() -> void:
-	# The original brush and scenery sites are occupied by a new-run court.
-	# Run these specific editing regressions against that older hotel geometry.
-	var sim: Sim = game.simulation
-	var plan: Layout = sim.layout.duplicate_layout()
-	for venue in plan.amenities():
-		plan.remove_prop(venue.id)
-	sim.apply_construction(plan)
+	# Preserve the isolated brush/scenery fixture, without showcase path overrides.
+	# developer_scene_test covers the populated new-run flow separately.
+	var sim := Sim.new()
+	sim.mode = game.simulation.mode
+	sim.layout = Layout.new(false)
+	sim._reset_room_slots()
+	game._set_simulation(sim)
+	game.camera.configure(Layout.WORLD_BOUNDS, Vector2(280, 170), 1.7)
 	game._refresh()
 
 

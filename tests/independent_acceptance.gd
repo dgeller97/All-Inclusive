@@ -221,8 +221,8 @@ func _test_scene() -> void:
 	game.ui._speed_buttons[1].pressed.emit()
 	_check(game.simulation.count_at(1, "wait_table") == 1 and game.simulation.count_at(2, "service") == 1,
 		"Checkpoint contains dining-table wait and active pool service")
-	_check("Day 2" in game.ui._body.effective.text and "3 families" in game.ui._body.effective.text
-		and "Higher expectations" in game.ui._body.details.text and "Standard $120" in game.ui._body.booking.text,
+	_check("Day 2" in game.ui._body.effective.text and "$170" in game.ui._body.effective.text
+		and "3 families" in game.ui._body.details.text and "$120" in game.ui._body.booking.text,
 		"Booking panel distinguishes the current booking lock from next-day Premium demand")
 	_key(KEY_ESCAPE)
 	_check(not game.ui.has_open_panel() and not game.settings_open, "Escape closes an open contextual panel before opening Settings")
@@ -404,12 +404,18 @@ func _test_v1_slot() -> void:
 	var loaded: Dictionary = game.simulation.snapshot()
 	for key in ["mode", "layout", "pending_layout", "pending_reserve", "booked_count", "meal_version", "leisure_version"]:
 		loaded.erase(key)
+	for key in ["beach_version", "selected_price", "booked_price", "booked_value", "swim_policy", "sargassum", "ocean_incidents", "coast_runtime"]:
+		loaded.erase(key)
 	for family in loaded.families:
 		for key in ["table_id", "dining_wait", "legacy_meal"]:
 			family.erase(key)
 		for key in Sim.LEISURE_DEFAULTS:
 			family.erase(key)
+		for key in Sim.OCEAN_DEFAULTS:
+			family.erase(key)
 	_check(loaded == saved.get("simulation") and game.simulation.mode == "regular"
+		and game.simulation.booked_price == 120 and game.simulation.swim_policy == "safe" and game.simulation.sargassum == 0
+		and game.simulation.beach_deposits.is_empty() and game.simulation.lifeguard_assignment.is_empty()
 		and game.simulation.layout.readiness().ok and game.camera.snapshot() == home
 		and game.map.ocean.condition_name() == "Closed"
 		and game.map.ocean.condition_color() == Ocean.CONDITION_COLORS[Ocean.Condition.CLOSED],

@@ -64,7 +64,8 @@ func _initialize() -> void:
 	var isolated = layout.duplicate_layout()
 	isolated.remove_building(isolated.buildings[4].id)
 	check(isolated.add_building("bedroom", Rect2(24, 128, 64, 48)).ok, "Place wall across original bedroom exit")
-	check(isolated.room_points().size() == 3, "Building blocking door removes inaccessible room")
+	check(isolated.room_points().size() == 4 and isolated.building_unit(room.id).size() == 2,
+		"The shared wall opens a passage and keeps the original bedroom reachable")
 	var rotated = layout.duplicate_layout()
 	var placed: Dictionary = rotated.add_asset("bench", room.id, Vector2i(5, 3), 1)
 	check(placed.ok, "Rotated furnishing fits")

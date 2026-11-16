@@ -30,6 +30,16 @@ class ActorProbe extends "res://scripts/resort_map.gd":
 				patch.fill(color)
 				picture.blend_rect(patch, Rect2i(Vector2i.ZERO, bounds.size), bounds.position - WORLD.position)
 
+	func _actor_texture(texture: Texture2D, at: Vector2) -> void:
+		if picture:
+			var frame := texture.get_image()
+			frame.convert(Image.FORMAT_RGBA8)
+			picture.blend_rect(frame, Rect2i(Vector2i.ZERO, frame.get_size()), Vector2i(at) - WORLD.position)
+
+	func _actor_flag(_prop: Dictionary) -> void:
+		# The venue probe records texture and actor commands outside the engine draw callback.
+		pass
+
 	func _actor_region(destination: Rect2, source: Rect2) -> void:
 		regions.append(destination)
 		if not picture:
@@ -42,7 +52,6 @@ class ActorProbe extends "res://scripts/resort_map.gd":
 		var point := Vector2i(destination.position) - WORLD.position
 		if destination.size.x < 0:
 			frame.flip_x()
-			point.x -= frame.get_width()
 		picture.blend_rect(frame, Rect2i(Vector2i.ZERO, frame.get_size()), point)
 
 	func has_color(color: Color) -> bool:
@@ -150,9 +159,9 @@ func _test_live_poses(sim: Sim, samples: Dictionary) -> void:
 		_check(map.actor_visible(pose.point) and map.actor_visible(pose.child), "%s guests stay visible in Exterior" % kind)
 		match kind:
 			"beach_lounge":
-				_check(map.regions.any(func(rect: Rect2) -> bool: return rect.size.y == 10)
-					and map.regions.any(func(rect: Rect2) -> bool: return rect.size.y == 7),
-					"Loungers use seated adult and child sprites")
+				_check(map.regions.any(func(rect: Rect2) -> bool: return rect.size.abs() == Vector2(11, 16))
+					and map.regions.any(func(rect: Rect2) -> bool: return rect.size.abs() == Vector2(11, 12)),
+					"Loungers use native seated adult and child sprites")
 			"volleyball":
 				_check(map.has_color(map.BEACH_BALL), "Volleyball draws the ball during real play")
 			"beach_bar":

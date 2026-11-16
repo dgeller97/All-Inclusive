@@ -35,9 +35,15 @@ func _run() -> void:
 
 
 func _test_developer() -> void:
-	_button(game.dialog, "Developer · Free build").pressed.emit()
+	_button(game.dialog, "Developer showcase").pressed.emit()
+	_check(game.simulation.mode == "developer", "Welcome selects Developer mode")
+	# Isolate the original construction workflow from preplaced showcase furniture.
+	# The full showcase entry/edit/save behavior is covered by developer_scene_test.
+	var fixture := Sim.new()
+	fixture.mode = "developer"
+	game._set_simulation(fixture)
+	game.camera.configure(Layout.WORLD_BOUNDS, Vector2(280, 170), 1.7)
 	var initial: Sim = game.simulation
-	_check(initial.mode == "developer", "Welcome selects Developer mode")
 	_tick(0)
 	_open_build()
 	var draft: Layout = game.design.draft

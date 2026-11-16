@@ -55,6 +55,7 @@ func _test_catalogs() -> void:
 	_check(ui._category_buttons.facilities.text == "Facilities" and ui._category_buttons.facilities.button_pressed
 		and not ui._landscape_buttons.terrain.is_visible_in_tree(), "Facilities opens directly from Build")
 	for kind in FACILITY_PRICES:
+		_open_facility_group(kind)
 		var button: Button = ui._tool_buttons[kind]
 		var price: Label = button.get_node("Price")
 		var name_label: Label = ui._tool_labels[kind]
@@ -164,6 +165,7 @@ func _test_purchase_and_queue() -> void:
 	_choose(ui._tool_buttons.bulldoze)
 	_click_world(bar.rect.get_center())
 	_choose(ui._category_buttons.facilities)
+	_open_facility_group("beach_bar")
 	_choose(ui._tool_buttons.beach_bar)
 	_click_world(bar.rect.position + Vector2(4, 4))
 	var added := game.design.draft.amenities("beach_bar")
@@ -226,6 +228,7 @@ func _test_developer() -> void:
 	_open_build()
 	_choose(ui._category_buttons.facilities)
 	for kind in FACILITY_PRICES:
+		_open_facility_group(kind)
 		var price: Label = ui._tool_buttons[kind].get_node("Price")
 		_check(price.is_visible_in_tree() and price.text == "Free", "Developer marks %s visibly Free" % kind)
 	_audit_catalog("Developer Facilities")
@@ -250,6 +253,13 @@ func _bar_in_use(id: int) -> bool:
 		if family.amenity_id == id and family.phase == "leisure":
 			return true
 	return false
+
+
+func _open_facility_group(kind: String) -> void:
+	for group in Layout.Landscape.FACILITY_GROUPS:
+		if kind in Layout.Landscape.FACILITY_GROUPS[group]:
+			_choose(game.design_ui._facility_group_buttons[group])
+			return
 
 
 func _audit_catalog(title: String) -> void:

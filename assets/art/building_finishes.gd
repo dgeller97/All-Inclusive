@@ -20,6 +20,14 @@ static func texture(surface: String, finish: String) -> Texture2D:
 		"wall/plaster": _plaster(tile, "#cbd4bb", "#bac5a9", "#dbe0c7")
 		"wall/brick": _brick(tile)
 		"wall/timber": _boards(tile, "#ad7758", "#99644f", "#774c43")
+		"facade/default": _plaster(tile, "#efc89e", "#e8bf96", "#f5d1a9")
+		"facade/plaster": _plaster(tile, "#9dc2b3", "#89afa1", "#c3d7ba")
+		"facade/brick": _brick(tile)
+		"facade/timber": _boards(tile, "#bc9569", "#a77d5d", "#815c4f")
+		"roof/default": _roof(tile, "#bd7258", "#e0a678", "#8f5148", false)
+		"roof/terracotta": _roof(tile, "#ca8050", "#f2b476", "#9d533f", false)
+		"roof/slate": _roof(tile, "#6f8291", "#a6b4ba", "#4b5b72", false)
+		"roof/metal": _roof(tile, "#79a49d", "#a7d2c3", "#4e7875", true)
 		"ceiling/default": _plaster(tile, "#f4dfba", "#eddbb5", "#f9e9ca")
 		"ceiling/plaster": _plaster(tile, "#c5d5cc", "#b6c9bd", "#d4e0d6")
 		"ceiling/beams": _beams(tile)
@@ -28,6 +36,21 @@ static func texture(surface: String, finish: String) -> Texture2D:
 	var result := ImageTexture.create_from_image(tile)
 	_textures[key] = result
 	return result
+
+
+static func _roof(tile: Image, body: String, light: String, seam: String, metal: bool) -> void:
+	tile.fill(Color(body))
+	if metal:
+		for x in [2, 10]:
+			_ink(tile, x, 0, 1, 16, seam)
+			_ink(tile, x + 1, 0, 1, 16, light)
+	else:
+		for y in [0, 4, 8, 12]:
+			_ink(tile, 0, y, 16, 1, seam)
+			var offset: int = 2 + (int(y) >> 2) % 2 * 4
+			for x in [offset, offset + 8]:
+				_ink(tile, x, y + 1, 1, 3, seam)
+				_ink(tile, x + 1, y + 1, 2, 1, light)
 
 
 static func _ink(tile: Image, x: int, y: int, width: int, height: int, color: String) -> void:

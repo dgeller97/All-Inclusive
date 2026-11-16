@@ -19,18 +19,22 @@ const TEAL := Color("#235c54")
 const TEAL_HOVER := Color("#316e63")
 const MARGIN := 16.0
 const SPEEDS := [1, 2, 4]
+const DEVELOPER_BEACH_HEIGHT := 510.0
+const GUARD_SITES := ["beach", "pool"]
 const PANELS := {
-	"package": ["Booking", "Booking desk", "Choose a package and set the room price", Vector2(372, 224)],
-	"staff": ["Staff", "Staff assignments", "Assign the floating worker and check dining capacity", Vector2(344, 282)],
-	"pool": ["Leisure", "Pool and beach", "Check pool upgrades and beach activities", Vector2(336, 326)],
+	"package": ["Booking", "Booking desk", "Set the nightly room price", Vector2(372, 253)],
+	"staff": ["Staff", "Staff assignments", "Manage the floating worker, dining capacity and lifeguard", Vector2(344, 346)],
+	"pool": ["Leisure", "Pool and facilities", "Check pool upgrades and facility capacity", Vector2(336, 326)],
+	"beach": ["Beach", "Beach and surf", "Manage ocean swimming and beach cleaning", Vector2(374, 332)],
 	"reviews": ["Reviews", "Latest review", "Read the latest guest review", Vector2(336, 192)],
 	"goals": ["Goals", "Day 3 targets", "Check the opening weekend targets", Vector2(330, 224)],
-	"settings": ["Settings", "Settings", "Save, load, or change sound (Esc)", Vector2(320, 236)],
+	"settings": ["Settings", "Settings", "Save, load, sound, or animation viewer (Esc)", Vector2(320, 285)],
 	"design": ["Build", "Design mode", "Draw buildings, place furniture and edit the landscape", Vector2.ZERO],
 }
 
 class PixelIcon extends Control:
 	const PATTERNS := {
+		"beach": ["............", "...#######..", "...######...", "...#####....", "...####.....", "...#........", "...#........", "..####......", "............", ".##..##..##.", "...##..##...", "............"],
 		"package": ["............", "..########..", ".#........#.", ".#.###....#.", ".#........#.", ".#.######.#.", ".#........#.", ".#.####...#.", ".#.......##.", ".#....#####.", "..######....", "............"],
 		"staff": ["............", "...###..##..", "..#####.###.", "..#####.###.", "...###..##..", "............", "..#####.##..", ".#######.##.", ".#######.##.", ".#######.##.", "............", "............"],
 		"pool": ["............", "...####.....", "..######....", ".########...", ".....#......", ".....#......", "............", ".##..##..##.", "...##..##...", ".##..##..##.", "...##..##...", "............"],
@@ -68,6 +72,8 @@ var _popover: Panel
 var _toast_label: Label
 var _clock_heading: Label
 var _clock: Label
+var _date_heading: Label
+var _temperature: Label
 var _cash: Label
 var _rating: Label
 var _pause: Button
@@ -116,7 +122,10 @@ func refresh(data: Dictionary) -> void:
 	if _status == null or sim == null:
 		return
 	_clock_heading.text = "DAY %d / %d" % [sim.day, Sim.FINAL_DAY] if sim.day <= Sim.FINAL_DAY else "DAY %d" % sim.day
-	_clock.text = "%02d:%02d" % [floori(sim.second / 60.0), sim.second % 60]
+	var calendar := sim.calendar_state()
+	_clock.text = calendar.time_label
+	_date_heading.text = "%s %d · Y%d" % [str(calendar.month_name).to_upper(), calendar.day_in_month, calendar.year]
+	_temperature.text = "%d°C" % roundi(calendar.temperature_c)
 	_cash.text = "$%d" % sim.cash
 	_rating.text = "—" if sim.reviews.is_empty() else "%.1f / 100" % sim.average()
 	var paused: bool = data.get("paused", false)
@@ -146,6 +155,10 @@ func open_panel(id: String) -> void:
 	_panel_id = id
 	var entry: Array = PANELS[id]
 	var panel_size: Vector2 = entry[3]
+	var sim: Sim = _state.get("simulation")
+	var developer := sim != null and sim.mode == "developer"
+	if id == "beach" and developer:
+		panel_size.y = DEVELOPER_BEACH_HEIGHT
 	_popover = _surface(self, Rect2(Vector2.ZERO, panel_size), PAPER, LINE)
 	var icon := _icon(_popover, Rect2(15, 12, 24, 24), id, TEAL)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -159,12 +172,12 @@ func open_panel(id: String) -> void:
 		"package": _build_package()
 		"staff": _build_staff()
 		"pool": _build_pool()
+		"beach": _build_beach(developer)
 		"reviews": _build_reviews()
 		"goals": _build_goals()
 		"settings": _build_settings()
 	_layout_popover()
 	_sync_dock()
-	var sim: Sim = _state.get("simulation")
 	if sim != null:
 		_refresh_panel(sim)
 	action_requested.emit("open_panel", id)
@@ -187,12 +200,26 @@ func has_open_panel() -> bool:
 	return not _panel_id.is_empty()
 
 
+func has_transient_popup() -> bool:
+	var month: OptionButton = _body.get("developer_month")
+	return month != null and month.get_popup().visible
+
+
+func close_transient_popup() -> bool:
+	if has_transient_popup():
+		_body.developer_month.get_popup().hide()
+		return true
+	return false
+
+
 func is_pointer_over_ui(point: Vector2) -> bool:
 	if not _interactive or not is_visible_in_tree():
 		return false
 	for surface in _surfaces:
 		if surface.is_visible_in_tree() and surface.get_global_rect().has_point(point):
 			return true
+	if has_transient_popup():
+		return true
 	return is_instance_valid(_popover) and _popover.get_global_rect().has_point(point)
 
 
@@ -218,7 +245,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _build_status() -> void:
-	_status = _surface(self, Rect2(MARGIN, MARGIN, 304, 57), CHROME, CHROME_EDGE)
+	_status = _surface(self, Rect2(MARGIN, MARGIN, 428, 57), CHROME, CHROME_EDGE)
 	_surfaces.append(_status)
 	_clock_heading = _label(_status, Rect2(13, 6, 81, 18), "DAY 1 / 3", 12, GOLD)
 	_clock = _label(_status, Rect2(13, 24, 81, 27), "00:00", 22, CREAM)
@@ -228,6 +255,10 @@ func _build_status() -> void:
 	_divider(_status, Rect2(195, 10, 1, 37), CHROME_EDGE)
 	_label(_status, Rect2(208, 6, 86, 18), "RATING", 12, GOLD)
 	_rating = _label(_status, Rect2(208, 24, 89, 27), "—", 17, CREAM)
+	_divider(_status, Rect2(298, 10, 1, 37), CHROME_EDGE)
+	_date_heading = _label(_status, Rect2(309, 6, 112, 18), "MARCH 1 · Y1", 12, GOLD)
+	_date_heading.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_temperature = _label(_status, Rect2(309, 24, 112, 27), "26°C", 17, CREAM)
 
 
 func _build_transport() -> void:
@@ -248,7 +279,7 @@ func _build_transport() -> void:
 
 
 func _build_dock() -> void:
-	_dock = _surface(self, Rect2(0, 0, 511, 63), CHROME, CHROME_EDGE)
+	_dock = _surface(self, Rect2(0, 0, PANELS.size() * 72 + 7, 63), CHROME, CHROME_EDGE)
 	_surfaces.append(_dock)
 	var i := 0
 	for id in PANELS:
@@ -288,18 +319,40 @@ func _build_camera() -> void:
 
 
 func _build_package() -> void:
+	_body.effective = _label(_popover, Rect2(15, 54, 340, 27), "", 16, INK)
+	var slider := HSlider.new()
+	slider.name = "RoomPrice"
+	slider.position = Vector2(20, 88)
+	slider.size = Vector2(332, 24)
+	slider.min_value = Sim.MIN_PRICE
+	slider.max_value = Sim.MAX_PRICE
+	slider.step = Sim.PRICE_STEP
+	slider.accessibility_name = "Nightly room price"
+	slider.tooltip_text = "Nightly room price per family"
+	slider.mouse_force_pass_scroll_events = false
+	slider.add_theme_stylebox_override("slider", _box(LINE, LINE, 3, 0, 2))
+	slider.add_theme_stylebox_override("grabber_area", _box(TEAL, TEAL, 3, 0, 2))
+	slider.add_theme_stylebox_override("grabber_area_highlight", _box(TEAL_HOVER, TEAL_HOVER, 3, 0, 2))
+	_popover.add_child(slider)
+	slider.value_changed.connect(_room_price_changed)
+	_body.slider = slider
+	_label(_popover, Rect2(15, 112, 100, 19), "$%d" % Sim.MIN_PRICE, 12, MUTED)
+	_label(_popover, Rect2(257, 112, 100, 19), "$%d" % Sim.MAX_PRICE, 12, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	var options: Array[Button] = []
 	for i in range(Sim.PACKAGES.size()):
 		var package: Dictionary = Sim.PACKAGES[i]
-		var option := _button(_popover, Rect2(14 + i * 116, 58, 111, 57), "%s\n$%d" % [package.name, package.price], _request.bind("package", i), false, true)
+		var option := _button(_popover, Rect2(14 + i * 116, 138, 111, 34), "%s $%d" % [package.name, package.price], _request.bind("package", i), false, true)
 		option.tooltip_text = "%d families · %s · %+d rating" % [package.bookings, package.cue, package.value]
 		option.accessibility_name = "%s package, $%d" % [package.name, package.price]
 		options.append(option)
 	_body.options = options
-	_body.effective = _label(_popover, Rect2(15, 122, 342, 23), "", 16, INK)
-	_body.details = _label(_popover, Rect2(15, 146, 342, 23), "", 15, MUTED)
-	_divider(_popover, Rect2(14, 179, 344, 1), LINE)
-	_body.booking = _label(_popover, Rect2(15, 185, 342, 26), "", 14, TEAL)
+	_body.details = _label(_popover, Rect2(15, 179, 342, 23), "", 15, MUTED)
+	_divider(_popover, Rect2(14, 212, 344, 1), LINE)
+	_body.booking = _label(_popover, Rect2(15, 217, 342, 26), "", 14, TEAL)
+
+
+func _room_price_changed(value: float) -> void:
+	_request("room_price", roundi(value))
 
 
 func _build_staff() -> void:
@@ -310,7 +363,22 @@ func _build_staff() -> void:
 		options.append(option)
 	_body.options = options
 	_body.tables = _label(_popover, Rect2(15, 209, 314, 25), "", 15, INK)
-	_label(_popover, Rect2(15, 239, 314, 27), "Extra dining tables are available in Build.", 14, MUTED)
+	_divider(_popover, Rect2(14, 242, 316, 1), LINE)
+	_label(_popover, Rect2(15, 247, 104, 23), "Lifeguard", 16, INK)
+	_body.guard_cost = _label(_popover, Rect2(120, 248, 209, 22), "", 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	_body.guard_status = _label(_popover, Rect2(15, 272, 314, 21), "", 14, TEAL)
+	_body.guard_sites = {}
+	for i in GUARD_SITES.size():
+		var site: String = GUARD_SITES[i]
+		var button := _button(_popover, Rect2(14 + i * 161, 300, 155, 32), site.capitalize(),
+			_select_guard_site.bind(site), false, true)
+		button.name = "Lifeguard" + site.capitalize()
+		_body.guard_sites[site] = button
+
+
+func _select_guard_site(site: String) -> void:
+	var action := "assign_lifeguard" if _body.get("guard_hired", false) else "hire_lifeguard"
+	_request(action, site)
 
 
 func _build_pool() -> void:
@@ -318,15 +386,122 @@ func _build_pool() -> void:
 	_label(_popover, Rect2(15, 78, 305, 20), "Two loungers and an umbrella add a pool slot.", 13, MUTED)
 	_divider(_popover, Rect2(15, 105, 306, 1), LINE)
 	_body.amenities = {}
-	var y := 112
+	_body.amenity_rows = {}
+	var scroll := ScrollContainer.new()
+	scroll.name = "FacilityCapacity"
+	scroll.position = Vector2(14, 108)
+	scroll.size = Vector2(307, 109)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.mouse_force_pass_scroll_events = false
+	scroll.accessibility_name = "Facility capacity"
+	_popover.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 1)
+	scroll.add_child(list)
 	for kind in Sim.LEISURE_DURATIONS:
 		var info: Dictionary = Sim.Layout.Landscape.PROP_CATALOG[kind]
-		_label(_popover, Rect2(15, y, 154, 23), info.label, 14, INK)
-		_body.amenities[kind] = _label(_popover, Rect2(170, y, 150, 23), "", 14, TEAL, HORIZONTAL_ALIGNMENT_RIGHT)
-		y += 26
-	_label(_popover, Rect2(15, 222, 305, 21), "Shows begin at 03:00 · Drinks included", 13, MUTED)
+		var row := Control.new()
+		row.custom_minimum_size = Vector2(287, 25)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		list.add_child(row)
+		_body.amenity_rows[kind] = row
+		_label(row, Rect2(1, 0, 142, 25), info.label, 14, INK)
+		_body.amenities[kind] = _label(row, Rect2(145, 0, 142, 25), "", 14, TEAL, HORIZONTAL_ALIGNMENT_RIGHT)
+	_label(_popover, Rect2(15, 222, 305, 21), "Nightclub and stage open at midnight.", 13, MUTED)
 	_label(_popover, Rect2(15, 245, 305, 21), "Each activity adds 1 rating point, up to 3.", 13, MUTED)
 	_button(_popover, Rect2(14, 275, 308, 37), "Open Build", _request.bind("build"), false)
+
+
+func _build_beach(developer: bool) -> void:
+	_body.surf = _label(_popover, Rect2(15, 52, 345, 24), "", 17, TEAL)
+	_body.swimmers = _label(_popover, Rect2(15, 77, 345, 22), "", 14, MUTED)
+	var names := ["Safe flags", "Allow red risk", "Closed"]
+	var hints := ["Allow green and yellow flags. Swimmers leave when the flag turns red.",
+		"Guests may enter red-flag surf and can drown.", "Close ocean swimming at every flag."]
+	_body.policies = {}
+	for i in range(Sim.SWIM_POLICIES.size()):
+		var policy: String = Sim.SWIM_POLICIES[i]
+		var button := _button(_popover, Rect2(14 + i * 116, 106, 112, 37), names[i], _request.bind("swim_policy", policy), false, true)
+		button.tooltip_text = hints[i]
+		button.accessibility_name = names[i]
+		_body.policies[policy] = button
+	_body.swim_warning = _label(_popover, Rect2(15, 149, 344, 39), "", 14, MUTED)
+	_body.swim_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_divider(_popover, Rect2(14, 194, 346, 1), LINE)
+	_body.seaweed = _label(_popover, Rect2(15, 200, 184, 25), "", 15, INK)
+	_body.offshore = _label(_popover, Rect2(202, 200, 158, 25), "", 14, TEAL, HORIZONTAL_ALIGNMENT_RIGHT)
+	_body.clean = _button(_popover, Rect2(14, 232, 346, 33), "Clean beach", _request.bind("clean_beach"), false)
+	_body.clean.tooltip_text = "Remove up to 60 percentage points of sargassum buildup."
+	_body.incidents = _label(_popover, Rect2(15, 273, 345, 22), "", 14, MUTED)
+	_body.beach_guard = _label(_popover, Rect2(15, 296, 345, 22), "", 14, TEAL)
+	_body.beach_guard.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	if developer:
+		_build_developer_beach()
+
+
+func _build_developer_beach() -> void:
+	_divider(_popover, Rect2(14, 323, 346, 1), LINE)
+	_label(_popover, Rect2(15, 329, 344, 22), "Developer tests", 16, INK)
+	_label(_popover, Rect2(15, 357, 85, 32), "Month", 14, INK)
+	var month := OptionButton.new()
+	month.name = "DeveloperMonth"
+	month.position = Vector2(103, 357)
+	month.size = Vector2(257, 32)
+	month.accessibility_name = "Simulation month"
+	month.tooltip_text = "Preview a season without advancing the resort day or guest activity."
+	_style_button(month, false, false)
+	month.add_item("Calendar auto", 0)
+	for i in Sim.Calendar.MONTHS.size():
+		month.add_item(Sim.Calendar.MONTHS[i], i + 1)
+	month.item_selected.connect(func(index: int) -> void: _request("developer_month", month.get_item_id(index)))
+	_popover.add_child(month)
+	_buttons.append(month)
+	var menu := month.get_popup()
+	menu.add_theme_stylebox_override("panel", _box(PAPER, LINE, 4, 1, 6))
+	menu.add_theme_stylebox_override("hover", _box(TEAL, TEAL, 3))
+	menu.add_theme_font_override("font", _ui_font)
+	menu.add_theme_font_size_override("font_size", 14)
+	menu.add_theme_color_override("font_color", INK)
+	menu.add_theme_color_override("font_hover_color", CREAM)
+	menu.window_input.connect(_month_menu_input)
+	_body.developer_month = month
+	_label(_popover, Rect2(15, 398, 158, 19), "Offshore intensity", 14, INK)
+	_body.intensity_value = _label(_popover, Rect2(181, 398, 179, 19), "", 14, TEAL, HORIZONTAL_ALIGNMENT_RIGHT)
+	var intensity := HSlider.new()
+	intensity.name = "DeveloperIntensity"
+	intensity.position = Vector2(15, 427)
+	intensity.size = Vector2(238, 28)
+	intensity.max_value = 100
+	intensity.step = 1
+	intensity.accessibility_name = "Offshore sargassum intensity"
+	intensity.tooltip_text = "Set intensity for new offshore patches. Existing patches continue drifting."
+	intensity.mouse_force_pass_scroll_events = false
+	intensity.add_theme_stylebox_override("slider", _box(LINE, LINE, 3, 0, 2))
+	intensity.add_theme_stylebox_override("grabber_area", _box(TEAL, TEAL, 3, 0, 2))
+	intensity.add_theme_stylebox_override("grabber_area_highlight", _box(TEAL_HOVER, TEAL_HOVER, 3, 0, 2))
+	intensity.value_changed.connect(_developer_intensity_changed)
+	_popover.add_child(intensity)
+	_body.intensity = intensity
+	_body.intensity_auto = _button(_popover, Rect2(265, 425, 95, 30), "Auto", _request.bind("developer_sargassum", -1), false, true)
+	_body.intensity_auto.tooltip_text = "Use the selected month's natural offshore intensity."
+	_body.arrival = _button(_popover, Rect2(14, 462, 172, 34), "Force offshore arrival", _request.bind("developer_arrival"), false)
+	_body.arrival.tooltip_text = "Send one new patch toward the shore at its normal drift speed."
+	_body.drill = _button(_popover, Rect2(192, 462, 168, 34), "Start rescue drill", _request.bind("developer_rescue_drill"), false)
+	_body.drill.name = "DeveloperRescueDrill"
+
+
+func _developer_intensity_changed(value: float) -> void:
+	_request("developer_sargassum", roundi(value))
+
+
+func _month_menu_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
+		var month: OptionButton = _body.developer_month
+		month.get_popup().set_input_as_handled()
+		close_transient_popup()
+		month.grab_focus()
+		_request("animations")
 
 
 func _build_reviews() -> void:
@@ -351,25 +526,25 @@ func _build_settings() -> void:
 	_button(_popover, Rect2(14, 57, 143, 41), "Save run", _request.bind("save"), false)
 	_body.load = _button(_popover, Rect2(163, 57, 143, 41), "Load run", _request.bind("load"), false)
 	_body.sound = _button(_popover, Rect2(14, 106, 292, 41), "Sound on", _request.bind("mute"), false)
-	_button(_popover, Rect2(14, 155, 292, 41), "Quit to desktop", _request.bind("quit"), false)
-	_label(_popover, Rect2(15, 202, 291, 22), "Clock paused while Settings is open.", 13, MUTED)
+	_button(_popover, Rect2(14, 155, 292, 41), "Animation viewer (F8)", _request.bind("animations"), false)
+	_button(_popover, Rect2(14, 204, 292, 41), "Quit to desktop", _request.bind("quit"), false)
+	_label(_popover, Rect2(15, 251, 291, 22), "Clock paused while Settings is open.", 13, MUTED)
 
 
 func _refresh_panel(sim: Sim) -> void:
 	match _panel_id:
 		"package":
-			var next_day := sim.day + int(sim.booked_package >= 0)
-			var package: Dictionary = Sim.PACKAGES[sim.selected_package]
+			var next_day := sim.day + int(sim.booked_price > 0)
+			_body.slider.set_value_no_signal(sim.selected_price)
 			for i in range(_body.options.size()):
-				_body.options[i].set_pressed_no_signal(i == sim.selected_package)
-			var room_limit: int = sim.pending_layout.readiness().room_count if sim.pending_layout else sim.rooms.size()
-			_body.effective.text = "Day %d · up to %d families" % [next_day, mini(package.bookings, room_limit)]
-			_body.details.text = "%s · %+d rating" % [package.cue, package.value]
-			if sim.booked_package < 0:
-				_body.booking.text = "Bookings open at 00:20"
+				_body.options[i].set_pressed_no_signal(Sim.PACKAGES[i].price == sim.selected_price)
+			var room_limit: int = sim.pending_layout.readiness().room_count if sim.pending_layout and sim.booked_price > 0 else sim.rooms.size()
+			_body.effective.text = "$%d per family  ·  Day %d" % [sim.selected_price, next_day]
+			_body.details.text = "Up to %d families  ·  %+.1f rating for price" % [mini(Sim.price_demand(sim.selected_price), room_limit), Sim.price_value(sim.selected_price)]
+			if sim.booked_price == 0:
+				_body.booking.text = "Bookings open at 08:00"
 			else:
-				var booked: Dictionary = Sim.PACKAGES[sim.booked_package]
-				_body.booking.text = "Booked today · %d families · %s $%d" % [sim.booked_count, booked.name, booked.price]
+				_body.booking.text = "Booked today · %d families at $%d" % [sim.booked_count, sim.booked_price]
 		"staff":
 			for i in range(Sim.STATIONS.size()):
 				var option: Button = _body.options[i]
@@ -381,10 +556,13 @@ func _refresh_panel(sim: Sim) -> void:
 				option.accessibility_name = option.text
 				option.set_pressed_no_signal(selected)
 			_body.tables.text = "Tables %d/%d in use · %d waiting to eat" % [sim.occupied_tables(), sim.layout.dining_tables().size(), sim.count_at(1, "wait_table")]
+			_refresh_lifeguard(sim)
 		"pool":
 			_body.pool_status.text = "Terrace installed" if sim.terrace else "Terrace needs furnishings"
 			for kind in _body.amenities:
 				var rows := sim.layout.amenities(kind)
+				var placed := not rows.is_empty() or sim.layout.landscape.props.any(func(prop: Dictionary) -> bool: return prop.kind == kind)
+				_body.amenity_rows[kind].visible = kind in Sim.STARTER_LEISURE or placed
 				var available := 0
 				var occupied := 0
 				for amenity in rows:
@@ -393,13 +571,14 @@ func _refresh_panel(sim: Sim) -> void:
 				if available > 0:
 					_body.amenities[kind].text = "%d / %d families" % [occupied, available]
 				else:
-					var placed := sim.layout.landscape.props.any(func(prop: Dictionary) -> bool: return prop.kind == kind)
 					_body.amenities[kind].text = "No guest access" if placed else "Not built"
+		"beach":
+			_refresh_beach(sim)
 		"reviews":
 			if sim.reviews.is_empty():
 				_body.score.text = "No reviews yet"
 				_body.review_source.text = ""
-				_body.review_note.text = "The first families check out from 03:20."
+				_body.review_note.text = "The first families check out after 02:00."
 			else:
 				var review: Dictionary = sim.reviews.back()
 				_body.score.text = "%d / 100" % review.score
@@ -408,7 +587,7 @@ func _refresh_panel(sim: Sim) -> void:
 					_body.review_source.text += " · +%d from activities" % review.leisure_bonus
 				_body.review_note.text = review.note
 		"goals":
-			var stays: int = sim.milestone.get("stays", sim.reviews.size())
+			var stays: int = sim.milestone.get("stays", sim.reviews.size() - sim.ocean_incidents.size())
 			var average: float = sim.milestone.get("average", sim.average())
 			var terrace: bool = sim.milestone.get("terrace", sim.terrace)
 			_body.values[0].text = "%d / 8" % stays
@@ -421,6 +600,123 @@ func _refresh_panel(sim: Sim) -> void:
 			_body.load.disabled = not _state.get("can_load", false)
 			var muted: bool = _state.get("muted", false)
 			_body.sound.text = "Sound off · Turn on" if muted else "Sound on · Turn off"
+
+
+func _refresh_beach(sim: Sim) -> void:
+	var condition := sim.surf_condition()
+	_body.surf.text = ["Green flag · Calm surf", "Yellow flag · Caution", "Red flag · Dangerous surf"][condition]
+	_body.surf.add_theme_color_override("font_color", [TEAL, Color("#78501d"), Color("#8a3c3d")][condition])
+	var swimmers := sim.count_at(2, "ocean_swim")
+	_body.swimmers.text = "No guest access to the shoreline" if sim.layout.ocean_access().is_empty() else "%d families in the ocean" % swimmers
+	for policy in _body.policies:
+		_body.policies[policy].set_pressed_no_signal(policy == sim.swim_policy)
+	var warning := "Green and yellow flags allow swimming. Red flags send swimmers ashore."
+	if sim.swim_policy == "closed":
+		warning = "Ocean swimming is closed. Beach activities stay open."
+	elif sim.swim_policy == "allow_red":
+		warning = "Red-flag swimming is allowed. Guests can drown in dangerous surf."
+	_body.swim_warning.text = warning
+	_body.swim_warning.add_theme_color_override("font_color", Color("#8a3c3d") if sim.swim_policy == "allow_red" else MUTED)
+	_body.seaweed.text = "Shore buildup · %d%%" % sim.sargassum
+	_body.offshore.text = "Offshore patches · %d" % sim.floating_sargassum().size()
+	var cost := Sim.BEACH_CLEAN_COST if sim.mode == "regular" else 0
+	_body.clean.text = "Clean beach · $%d" % cost if cost > 0 else "Clean beach · Free"
+	_body.clean.disabled = sim.sargassum == 0 or (cost > 0 and sim.cash < cost)
+	var incidents := sim.ocean_incidents.size()
+	_body.incidents.text = "Fatal incidents · %d" % incidents
+	if incidents > 0:
+		var latest: Dictionary = sim.ocean_incidents.back()
+		var time: String = Sim.Calendar.state(latest.day, latest.second).time_label
+		_body.incidents.text += "  ·  Latest Day %d at %s" % [latest.day, time]
+	_body.beach_guard.text = _beach_guard_text(sim)
+	if _body.has("developer_month"):
+		_refresh_developer_beach(sim)
+
+
+func _refresh_lifeguard(sim: Sim) -> void:
+	var assignment := sim.lifeguard_assignment
+	var hired := not assignment.is_empty()
+	var busy := not sim.rescue.is_empty()
+	var free := sim.mode == "developer"
+	_body.guard_hired = hired
+	if hired:
+		_body.guard_cost.text = "No extra payroll" if free else "$%d/day payroll" % Sim.LIFEGUARD_PAYROLL
+		var status := "Available" if sim.lifeguard_site_available(assignment) else "Post inaccessible"
+		_body.guard_status.text = "%s · %s" % [_site_name(assignment), _rescue_activity(sim) if busy else status]
+	else:
+		_body.guard_cost.text = "Free to hire" if free else "$%d hire · $%d/day" % [Sim.LIFEGUARD_HIRE_COST, Sim.LIFEGUARD_PAYROLL]
+		_body.guard_status.text = "No lifeguard on duty"
+	for site: String in GUARD_SITES:
+		var button: Button = _body.guard_sites[site]
+		var site_name := _site_name(site)
+		button.text = site_name if hired else "Hire · " + site_name
+		button.accessibility_name = "%s lifeguard for %s" % ["Assign" if hired else "Hire", site_name]
+		button.set_pressed_no_signal(assignment == site)
+		var reachable: bool = sim.lifeguard_site_available(site)
+		var affordable := hired or free or sim.cash >= Sim.LIFEGUARD_HIRE_COST
+		button.disabled = busy or not reachable or not affordable
+		if busy:
+			button.tooltip_text = "The lifeguard is assisting a swimmer."
+		elif not reachable:
+			button.tooltip_text = "This site has no usable lifeguard post."
+		elif not affordable:
+			button.tooltip_text = "Hiring costs $%d. There is not enough cash." % Sim.LIFEGUARD_HIRE_COST
+		else:
+			button.tooltip_text = "Cover the main pool only." if site == "pool" else "Cover the ocean swimming area."
+
+
+func _beach_guard_text(sim: Sim) -> String:
+	if not sim.rescue.is_empty():
+		var drill: bool = sim.rescue.get("drill", false)
+		var who := " · Volunteer" if drill and sim.rescue.get("family", -1) == -1 else ""
+		return "%s · %s%s" % [_site_name(sim.rescue.site), _rescue_activity(sim), who]
+	if not sim.last_rescue.is_empty():
+		var result: String = {
+			"rescued": "Swimmer rescued",
+			"drill_complete": "Rescue drill complete",
+			"self_recovered": "Swimmer recovered",
+			"fatal": "Fatal incident",
+		}.get(sim.last_rescue.outcome, "")
+		if not result.is_empty():
+			return "Latest · %s · %s" % [_site_name(sim.last_rescue.site), result]
+	if sim.lifeguard_assignment == "beach":
+		return "Beach guard · Available" if sim.lifeguard_site_available("beach") else "Beach guard · Post inaccessible"
+	return "No lifeguard assigned to the beach"
+
+
+func _rescue_activity(sim: Sim) -> String:
+	var rescue := sim.rescue
+	var action := "Drill" if rescue.get("drill", false) else "Rescue"
+	var activity := "Swimming out"
+	if sim.second >= rescue.drop_at:
+		activity = "Returning to post"
+	elif rescue.phase == "tow":
+		activity = "Towing to safety"
+	return "%s · %s" % [action, activity]
+
+
+func _site_name(site: String) -> String:
+	return "Beach" if site == "beach" else "Main pool"
+
+
+func _refresh_developer_beach(sim: Sim) -> void:
+	_body.developer_month.select(sim.developer_month())
+	var automatic := sim.sargassum_intensity == -1
+	var intensity := roundi(float(sim.calendar_state().sargassum_pressure) * 100.0) if automatic else sim.sargassum_intensity
+	_body.intensity.set_value_no_signal(intensity)
+	_body.intensity_value.text = ("Auto · " if automatic else "") + "%d%%" % intensity
+	_body.intensity_auto.set_pressed_no_signal(automatic)
+	_body.drill.disabled = not sim.can_start_rescue_drill()
+	if sim.lifeguard_assignment.is_empty():
+		_body.drill.tooltip_text = "Hire a lifeguard in Staff first."
+	elif not sim.rescue.is_empty():
+		_body.drill.tooltip_text = "A rescue or drill is already underway."
+	elif not sim.lifeguard_site_available(sim.lifeguard_assignment):
+		_body.drill.tooltip_text = "Assign the lifeguard to an accessible post in Staff."
+	elif _body.drill.disabled:
+		_body.drill.tooltip_text = "There is not enough time left today."
+	else:
+		_body.drill.tooltip_text = "Practice at the assigned site. A volunteer fills in if no guest is available."
 
 
 func _layout() -> void:
@@ -569,6 +865,14 @@ func _button(parent: Control, rect: Rect2, words: String, callback: Callable,
 	button.size = rect.size
 	button.text = words
 	button.toggle_mode = toggle
+	_style_button(button, dark, primary)
+	button.pressed.connect(callback)
+	parent.add_child(button)
+	_buttons.append(button)
+	return button
+
+
+func _style_button(button: Button, dark: bool, primary: bool) -> void:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_override("font", _ui_font)
 	button.add_theme_font_size_override("font_size", 15)
@@ -590,7 +894,3 @@ func _button(parent: Control, rect: Rect2, words: String, callback: Callable,
 	button.add_theme_color_override("font_pressed_color", selected_ink)
 	button.add_theme_color_override("font_hover_pressed_color", selected_ink)
 	button.add_theme_color_override("font_disabled_color", MUTED)
-	button.pressed.connect(callback)
-	parent.add_child(button)
-	_buttons.append(button)
-	return button

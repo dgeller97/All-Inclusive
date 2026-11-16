@@ -14,8 +14,8 @@ const VALID := Color("#a8e0b5")
 const INVALID := Color("#ffb5aa")
 const MARGIN := 16.0
 const CONTEXT_SIZE := Vector2(1248, 120)
-const PALETTE_SIZE := Vector2(1000, 114)
-const BUILDING_SETTINGS_SIZE := Vector2(344, 264)
+const PALETTE_SIZE := Vector2(1140, 114)
+const BUILDING_SETTINGS_SIZE := Vector2(344, 347)
 const BUILDINGS := {"bedroom": "Bedroom", "reception": "Reception", "buffet": "Buffet", "pool": "Pool"}
 const ASSETS := {
 	"bed": "Bed", "desk": "Desk", "counter": "Counter", "table": "Table",
@@ -26,7 +26,7 @@ const LANDSCAPE_GROUPS := {"terrain": "Terrain", "path": "Paths", "scenery": "Sc
 const TERRAIN := {"grass": "Grass", "sand": "Sand", "dirt": "Dirt", "restore": "Restore"}
 const PATHS := {"stone": "Stone", "boardwalk": "Boardwalk", "erase": "Erase path"}
 const SCENERY := {"palm": "Palm", "bush": "Shrub", "rock": "Rock", "scenery_bench": "Bench", "beach_flag": "Beach flag"}
-const FACILITIES := {"beach_lounge": "Beach lounge", "volleyball": "Volleyball court", "beach_bar": "Beach bar", "stage": "Evening stage"}
+const FACILITY_GROUP_LABELS := {"water": "Water", "sport": "Sport", "social": "Social"}
 const TOOL_COLORS := {
 	"grass": Color("#a7c57a"), "sand": Color("#f9d894"), "dirt": Color("#d59c73"),
 	"stone": Color("#cbd1d6"), "boardwalk": Color("#e5ac75"),
@@ -34,11 +34,24 @@ const TOOL_COLORS := {
 	"beach_flag": Color("#ffa78d"),
 	"beach_lounge": Color("#f6c88a"), "volleyball": Color("#ffd698"),
 	"beach_bar": Color("#8ed6c6"), "stage": Color("#f5a7ae"),
+	"lap_pool": Color("#9fe0ec"), "lagoon_pool": Color("#a4edd4"), "hot_tub": Color("#f6ab96"),
+	"kids_pool": Color("#b6e8f2"), "waterpark": Color("#8ee7dd"), "basketball": Color("#ffae85"),
+	"climbing_wall": Color("#d9d9a0"), "arcade": Color("#cbaefd"), "cafe": Color("#f5ca9d"), "nightclub": Color("#f2a0d0"),
 }
 
 
 class PixelIcon extends Control:
 	const PATTERNS := {
+		"lap_pool": ["............", "............", ".##########.", ".#........#.", ".#.######.#.", ".#........#.", ".#.######.#.", ".#........#.", ".##########.", "............", "............", "............"],
+		"lagoon_pool": ["............", "............", "....#####...", "...#.....#..", "..#.......#.", ".#..##....#.", ".#.#..##.#..", ".##.....##..", "..######....", "............", "............", "............"],
+		"hot_tub": ["............", "...#....#...", "....#..#....", "...#....#...", ".##########.", ".#........#.", "..#..#.#.#..", "..#......#..", "...######...", "............", "............", "............"],
+		"kids_pool": ["............", ".......##...", "......####..", "...##..##...", "..####......", "...##.......", ".##########.", ".#..###...#.", ".######.###.", "............", "............", "............"],
+		"waterpark": ["............", "...####.....", "...#..##....", "...#...##...", "...#....##..", "...#.....##.", "...#......#.", ".####...###.", ".....###....", "..###...###.", "............", "............"],
+		"basketball": ["............", "....####....", "...#..#.#...", "..##..#.##..", "..##..##.#..", "..####...#..", "..#...####..", "..##.#...#..", "...#.#.##...", "....####....", "............", "............"],
+		"climbing_wall": ["............", ".....###....", "....##.#....", "...#.#.#....", "..##.#.##...", "..#..##.#...", ".#.#..#.##..", ".#.#.#..##..", ".#########..", "............", "............", "............"],
+		"arcade": ["............", "...######...", "...#....#...", "...#....#...", "...######...", "..#..#...#..", "..########..", "..#......#..", "..########..", "............", "............", "............"],
+		"cafe": ["............", "....#..#....", "...#..#.....", ".#########..", "..#....#.#..", "..#....###..", "...####.....", ".#########..", "............", "............", "............", "............"],
+		"nightclub": ["............", ".....####...", ".....#..#...", ".....#..#...", ".....#..#...", "...###.##...", "..#######...", "...##.##....", "............", "............", "............", "............"],
 		"design": ["............", ".##########.", ".#..#.....#.", ".#..#.....#.", ".####..#####", ".#.....#....", ".#.....#....", ".#.###.####.", ".#.#......#.", ".#.####...#.", ".##########.", "............"],
 		"select": ["............", "..#.........", "..##........", "..###.......", "..####......", "..#####.....", "..######....", "..#######...", "..##.##.....", "..#...##....", "......##....", "............"],
 		"bulldoze": ["............", ".......###..", "......#..#..", ".....#####..", "...#######..", "...#######.#", ".#########.#", ".#####.....#", "..##########", "...#..#..#..", "....#####...", "............"],
@@ -113,6 +126,7 @@ var _tool_sections: Dictionary = {}
 var _tool_prices: Dictionary = {}
 var _category_buttons: Dictionary = {}
 var _landscape_buttons: Dictionary = {}
+var _facility_group_buttons: Dictionary = {}
 var _brush_buttons: Dictionary = {}
 var _open_building_settings: Button
 var _building_settings: Panel
@@ -122,6 +136,7 @@ var _name_status: Label
 var _surface_settings: Control
 var _finish_fields: Dictionary = {}
 var _inspect_ceiling: Button
+var _inspect_exterior: Button
 var _settings_building_id := -1
 var _committed_name := ""
 
@@ -173,9 +188,14 @@ func refresh(data: Dictionary) -> void:
 	_refresh_building_settings(data)
 
 	var in_landscape := category == "landscape"
+	var in_facilities := category == "facilities"
 	var section := group if in_landscape else category
+	var facility_group: String = data.get("facility_group", "water")
+	if in_facilities:
+		section = facility_group
 	_refresh_choices(_category_buttons, category)
 	_refresh_choices(_landscape_buttons, group, in_landscape)
+	_refresh_choices(_facility_group_buttons, facility_group, in_facilities)
 	var selected_key: String = data.get("selected_tool", tool)
 	var regular := String(data.get("mode", "developer")).to_lower() == "regular"
 	for id in _tool_buttons:
@@ -198,7 +218,7 @@ func refresh(data: Dictionary) -> void:
 	_move.visible = in_landscape or can_move
 	_move.disabled = not can_move
 	_move.get_node("Icon").set_tint(MUTED if _move.disabled else (INK if tool == "move" else GOLD))
-	_rotate.visible = can_rotate or section in ["furniture", "scenery", "facilities"]
+	_rotate.visible = can_rotate or in_facilities or section in ["buildings", "furniture", "scenery"]
 	_rotate.disabled = not can_rotate
 	_rotate.accessibility_name = "Rotate clockwise (R), %d degrees" % turn
 	_rotate.get_node("Icon").set_tint(MUTED if _rotate.disabled else GOLD)
@@ -270,6 +290,7 @@ func _refresh_building_settings(data: Dictionary) -> void:
 		var choices: Array = Layout.FINISH_CATALOG[surface].keys()
 		field.select(choices.find(selected.finishes[surface]))
 	_inspect_ceiling.set_pressed_no_signal(data.get("inspect_ceiling", false))
+	_inspect_exterior.set_pressed_no_signal(data.get("inspect_exterior", false))
 	_building_settings.show()
 	_set_name.disabled = _name_field.text == _committed_name
 
@@ -341,7 +362,7 @@ func _tool_instruction(data: Dictionary, rotation: int) -> String:
 	var id: String = data.get("selected_tool", "")
 	match data.get("tool", "select"):
 		"building":
-			return "%s · Left-drag a footprint on the grid." % BUILDINGS.get(id, "Building")
+			return "%s · Left-drag a footprint on the grid. Rotation %d°." % [BUILDINGS.get(id, "Building"), rotation]
 		"asset":
 			return "%s · Left-click inside a building to place. Rotation %d°." % [ASSETS.get(id, "Furniture"), rotation]
 		"terrain", "path", "restore":
@@ -357,7 +378,7 @@ func _tool_instruction(data: Dictionary, rotation: int) -> String:
 			return "Move · Left-click a new location for the selected outdoor object."
 		"bulldoze":
 			return "Bulldoze · Left-click a placed object to remove it from the draft."
-	return "Select · Left-click a placed object to inspect it."
+	return "Select · Left-click a placed object to inspect or rotate it."
 
 
 func _build_context() -> void:
@@ -433,9 +454,12 @@ func _build_building_settings() -> void:
 		_surface_settings.add_child(field)
 		_finish_fields[surface] = field
 		y += 37.0
-	_inspect_ceiling = _button(_surface_settings, Rect2(80, y + 3, 252, 29), "Inspect ceiling", "inspect_ceiling")
+	_inspect_ceiling = _button(_surface_settings, Rect2(13, y + 3, 154, 29), "Inspect ceiling", "inspect_ceiling")
 	_inspect_ceiling.toggle_mode = true
 	_inspect_ceiling.tooltip_text = "Show the ceiling finish inside this building. Click again to return to the floor plan."
+	_inspect_exterior = _button(_surface_settings, Rect2(175, y + 3, 157, 29), "Inspect exterior", "inspect_exterior")
+	_inspect_exterior.toggle_mode = true
+	_inspect_exterior.tooltip_text = "Preview the roof and exterior of the draft."
 	_building_settings.hide()
 
 
@@ -447,7 +471,8 @@ func _build_palette() -> void:
 	_palette = _surface("DesignPalette", PALETTE_SIZE)
 	_add_choices(_category_buttons, CATEGORIES, 12, 104, "category")
 	_add_choices(_landscape_buttons, LANDSCAPE_GROUPS, 453, 70, "landscape_group")
-	_label(_palette, Rect2(680, 6, 308, 24), "Middle-drag pan · Wheel zoom · Esc cancels", 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+	_add_choices(_facility_group_buttons, FACILITY_GROUP_LABELS, 453, 70, "facility_group")
+	_label(_palette, Rect2(820, 6, 308, 24), "Middle-drag pan · Wheel zoom · Esc cancels", 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 	_add_tool("select", "Select", 12, "tool", "select", "Select and inspect an existing object.")
 	_add_tool("bulldoze", "Bulldoze", 86, "bulldoze", null, "Remove an object from the draft.")
 	_move = _add_tool("move", "Move", 160, "move", null, "Move the selected outdoor object.")
@@ -457,7 +482,11 @@ func _build_palette() -> void:
 	_add_catalog(TERRAIN, "terrain", "terrain")
 	_add_catalog(PATHS, "path", "path")
 	_add_catalog(SCENERY, "scenery", "prop", Layout.Landscape.PROP_CATALOG)
-	_add_catalog(FACILITIES, "facilities", "prop", Layout.Landscape.PROP_CATALOG, 124.0)
+	for group in Layout.Landscape.FACILITY_GROUPS:
+		var catalog := {}
+		for kind in Layout.Landscape.FACILITY_GROUPS[group]:
+			catalog[kind] = Layout.Landscape.PROP_CATALOG[kind].label
+		_add_catalog(catalog, group, "prop", Layout.Landscape.PROP_CATALOG, 124.0)
 	_brush_label = _label(_palette, Rect2(686, 35, 210, 20), "Brush size", 13, GOLD)
 	for index in range(3):
 		var brush_size := 1 + index * 2
@@ -467,7 +496,7 @@ func _build_palette() -> void:
 		button.toggle_mode = true
 		button.accessibility_name = "%s tile brush" % words
 		_brush_buttons[brush_size] = button
-	_rotate = _button(_palette, Rect2(910, 34, 78, 50), "", "rotate")
+	_rotate = _button(_palette, Rect2(1050, 34, 78, 50), "", "rotate")
 	_rotate.tooltip_text = "Rotate clockwise by 90° (R)."
 	_rotate.accessibility_name = "Rotate clockwise (R)"
 	_icon(_rotate, "rotate", 78.0)
@@ -502,7 +531,8 @@ func _add_catalog(catalog: Dictionary, section: String, action: String,
 				value = "bench"
 		var item: Dictionary = items.get(value, {})
 		if item.has("capacity"):
-			help = "%s · %d families" % [item.label, item.capacity]
+			var capacity := "1 family" if item.capacity == 1 else "%d families" % item.capacity
+			help = "%s · %s" % [item.label, capacity]
 		var cost: int = item.get("cost", -1)
 		var button := _add_tool(id, words, x, request, value, help, section, tile_width, cost >= 0)
 		if cost >= 0:

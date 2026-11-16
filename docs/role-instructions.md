@@ -30,6 +30,22 @@ For revision 7's autonomous expansion, retain the same roster with a model/UI/co
 
 For revision 8's focused consistency fix, use one Sol/xhigh UI/core integrator under the Astra/high PM. Root owns an independent construction-consistency test and packaging. Reproduce the category-gated bug before changing controls, then test actual routed selection, purchases, removal and occupied-hotel staging. Do not recruit a second specialist or resume the native tester without a concrete need and authorization.
 
+Revision 9 uses two Sol/xhigh specialists under Astra/high PM: one model/UI/core integrator and one render/map/visual specialist. Root owns the isolated deterministic calendar, independent tests, research and final packaging. Keep ownership disjoint; no desktop use or tester resumption. The broad request includes every item in `revision-9.md`; final acceptance cannot silently defer a requested feature. No R9 push/release is authorized in this task.
+
+Revision 10 follows R9 source acceptance using the same two specialists and ownership. Root owns the independent activity-expansion test and final combined Windows packaging. Implement every catalog item in `revision-10.md`, preserving all four orientations and actual saved activity visits. No native tester or desktop capture; no push/release.
+
+Revision 11 uses one Sol/xhigh visual/core specialist under Astra/high PM for the seated-proportion bug, focused tests and export. Root owns independent proportion/spacing tests and packaging. Do not dismiss the user's screenshot based on earlier bounds-only tests; require native pixel scale and before/after actual-phase evidence. Preserve all R9/R10 source and the no-desktop restriction.
+
+Revision 13 uses two existing Sol/xhigh specialists: world expansion owns asset generation and geometry/indexing; systems owns the explicit Developer showcase factory and simulation coverage. Root owns new-run UI integration, independent tests and packaging. Preserve old world coordinates and every restored layout. Developer initialization is explicit, never a side effect of a mode setter or load. No native tester, desktop use or publication.
+
+Revision 14 uses one Sol/xhigh visual implementer for the isolated in-game animation viewer and one Sol/xhigh independent headless reviewer/test author with no production edits. Root owns main UI integration/modal lifecycle and packaging. Use actual production CanvasItem rendering and pose functions; never substitute CPU preview semantics. Preserve the user's live run and no-desktop restriction; do not resume native testing or redesign animations outside viewer correctness.
+
+Revision 15 uses the existing Sol/xhigh visual specialist as sole production owner of rendering/depth/art/pose changes, plus the Sol/xhigh systems specialist for independent semantic occlusion tests and audit notes only. Root owns integration/build, PM owns scope and acceptance. Require actual world/viewer parity, physical front/behind cases, rotated static-art inspection and generated visual evidence; do not rely on assertion counts or fix only the inspection viewer. Preserve the no-desktop restriction and all prior local work.
+
+Revision 17 uses one existing Sol/xhigh systems reviewer for independent ocean-season/swim-boundary tests only. Root owns Ocean/Map production and visual artifacts; PM reviews actual swimmer geometry, seasonal contract and acceptance. Keep floating seasonal patches deterministic from game time and separate from saved shore cleanup. No desktop/native testing or publication.
+
+Revision 18 reuses both Sol/xhigh specialists with explicit roles: systems owns simulation/new sargassum model and backend tests; visual specialist switches to UI integration owning HUD/controller actions and UI tests. Root owns Ocean/Map visual production and packaging. PM coordinates the shared arrival/rescue APIs and acceptance. R18 supersedes R17's decorative-only offshore field with an authoritative saved cohort/deposit ledger. No desktop use, native tester resumption or publication.
+
 ## Planner
 
 Define the smallest coherent loop that satisfies the brief. Provide numeric defaults, pacing, state changes, controls and acceptance criteria. Highlight assumptions. Hand off a concrete contract rapidly; avoid expanding scope.

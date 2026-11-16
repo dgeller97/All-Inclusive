@@ -1,6 +1,7 @@
 extends SceneTree
 
 const ResortCamera = preload("res://scripts/resort_camera.gd")
+const Landscape := preload("res://scripts/landscape_model.gd")
 var checks := 0
 var failures := 0
 
@@ -20,7 +21,7 @@ func _run() -> void:
 	var camera := ResortCamera.new()
 	camera.size = Vector2(1280, 720)
 	root.add_child(camera)
-	camera.configure(Rect2(-160, -120, 960, 600))
+	camera.configure(Landscape.WORLD_BOUNDS)
 	check(is_equal_approx(camera.zoom_level, 1.8), "Home zoom")
 	check(camera.screen_to_world(Vector2(640, 360)).is_equal_approx(Vector2(265, 150)), "Home focuses resort")
 	var cursor := Vector2(710, 350)

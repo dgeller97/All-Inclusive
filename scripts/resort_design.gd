@@ -13,7 +13,9 @@ var draft: Layout
 var tool := "select"
 var category := "buildings"
 var landscape_group := "terrain"
+var facility_group := "water"
 var building := "bedroom"
+var building_rotation := 0
 var asset := "bed"
 var asset_rotation := 0
 var brush_size := 1
@@ -27,15 +29,12 @@ var stroke_tail := Vector2i.ZERO
 var selection := {}
 var settings_building_id := -1
 var inspect_ceiling := false
+var inspect_exterior := false
 var feedback := ""
 var feedback_valid: Variant = null
 var ghost := Rect2()
 var ghost_check := {}
-var furniture: Texture2D
-
-
 func _ready() -> void:
-	furniture = Renderer.FURNITURE
 	hide()
 
 
@@ -44,7 +43,9 @@ func enter(source: Layout) -> void:
 	tool = "select"
 	category = "buildings"
 	landscape_group = "terrain"
+	facility_group = "water"
 	asset_rotation = 0
+	building_rotation = 0
 	brush_size = 1
 	brush_value = "grass"
 	selection = {}
@@ -92,10 +93,17 @@ func choose(action: String, value: Variant) -> void:
 					brush_value = "stone"
 				"scenery":
 					tool = "select"
+		"facility_group":
+			if category == "facilities" and Landscape.FACILITY_GROUPS.has(value):
+				facility_group = value
+				if tool == "prop" and prop_kind not in Landscape.FACILITY_GROUPS[facility_group]:
+					tool = "select"
 		"tool":
 			tool = "select"
 		"building":
 			tool = "building"
+			if building != value:
+				building_rotation = 0
 			building = value
 		"asset":
 			tool = "asset"
@@ -123,12 +131,32 @@ func choose(action: String, value: Variant) -> void:
 	_update_ghost()
 
 
-func rotate_asset() -> void:
-	if can_rotate():
-		asset_rotation = (asset_rotation + 1) % 4
-		feedback = ""
-		feedback_valid = null
+func rotate_asset() -> bool:
+	if not can_rotate():
+		return false
+	if tool == "select":
+		var result: Dictionary
+		if selection.has("rect"):
+			result = draft.rotate_building(selection.id)
+			if result.ok:
+				selection = draft.building_by_id(selection.id)
+		elif _prop_selected():
+			result = draft.move_prop(selection.id, Vector2i(selection.cell[0], selection.cell[1]), posmod(selection.rotation + 1, 4))
+			if result.ok:
+				selection = draft.landscape.prop_by_id(selection.id)
+		else:
+			result = draft.rotate_asset(selection.id)
+		_report(result, "%s rotated." % _object_name(selection))
 		_update_ghost()
+		return result.ok
+	if tool == "building":
+		building_rotation = (building_rotation + 1) % 4
+	else:
+		asset_rotation = (asset_rotation + 1) % 4
+	feedback = ""
+	feedback_valid = null
+	_update_ghost()
+	return false
 
 
 func cancel_operation() -> void:
@@ -148,7 +176,13 @@ func is_drawing() -> bool:
 
 
 func can_rotate() -> bool:
-	return tool in ["asset", "prop", "move"]
+	return tool in ["asset", "prop", "move", "building"] or (tool == "select" and not selection.is_empty())
+
+
+func displayed_rotation() -> int:
+	if tool == "select":
+		return selection.get("rotation", 0)
+	return building_rotation if tool == "building" else asset_rotation
 
 
 func can_move() -> bool:
@@ -246,7 +280,7 @@ func release(point: Vector2) -> bool:
 	move_pointer(point)
 	var result := {}
 	if point.is_finite():
-		result = draft.add_building(building, ghost)
+		result = draft.add_building(building, ghost, building_rotation)
 		_report(result, "%s built." % Layout.BUILDING_CATALOG[building].label)
 	drag_origin = Vector2.INF
 	_update_ghost()
@@ -260,7 +294,9 @@ func selection_text() -> String:
 	if selection.has("cell"):
 		return "%s · %d°" % [item, selection.rotation * 90]
 	var bounds := draft.building_rect(selection)
-	return "%s · %d × %d tiles" % [item, bounds.size.x / Layout.GRID, bounds.size.y / Layout.GRID]
+	var unit := draft.building_unit(selection.id)
+	var detail := "%d connected rooms" % unit.size() if unit.size() > 1 else "%d × %d tiles" % [bounds.size.x / Layout.GRID, bounds.size.y / Layout.GRID]
+	return "%s · %s · %d°" % [item, detail, selection.rotation * 90]
 
 
 func selected_building() -> Dictionary:
@@ -276,11 +312,19 @@ func open_building_settings() -> void:
 func close_building_settings() -> void:
 	settings_building_id = -1
 	inspect_ceiling = false
+	inspect_exterior = false
 
 
 func toggle_ceiling_inspection() -> void:
 	if settings_building_id >= 0 and selected_building().get("kind") != "pool":
 		inspect_ceiling = not inspect_ceiling
+		inspect_exterior = false
+
+
+func set_exterior_inspection(value: bool) -> void:
+	if settings_building_id >= 0 and selected_building().get("kind") != "pool":
+		inspect_exterior = value
+		inspect_ceiling = false
 
 
 func placement_feedback() -> Dictionary:
@@ -300,6 +344,10 @@ func placement_feedback() -> Dictionary:
 func _report(result: Dictionary, success: String = "") -> void:
 	feedback = success if result.ok else result.reason
 	feedback_valid = result.ok
+	if result.ok and result.has("id"):
+		var placed := draft.landscape.prop_by_id(result.id)
+		if not placed.is_empty() and Landscape.PROP_CATALOG[placed.kind].get("gate", false) and draft.amenity_by_id(placed.id).is_empty():
+			feedback += " Clear a path to the entrance for guests."
 
 
 func _object_name(entity: Dictionary) -> String:
@@ -398,7 +446,7 @@ func _update_ghost() -> void:
 			var top_left := cell.min(drag_origin)
 			var bottom_right := cell.max(drag_origin) + Vector2.ONE * Layout.GRID
 			ghost = Rect2(top_left, bottom_right - top_left)
-			ghost_check = draft.validate_building(building, ghost)
+			ghost_check = draft.validate_building(building, ghost, building_rotation)
 		else:
 			ghost = Rect2(cell, Vector2.ONE * Layout.GRID)
 	elif tool == "asset":
@@ -443,20 +491,32 @@ func _draw() -> void:
 	for y in range(int(bounds.position.y), int(bounds.end.y), Layout.GRID):
 		draw_line(Vector2(bounds.position.x, y), Vector2(bounds.end.x, y), GRID_INK)
 	if not selection.is_empty():
-		var rect: Rect2
 		if _prop_selected():
-			rect = draft.prop_visual_rect(selection)
+			draw_rect(draft.prop_visual_rect(selection), SELECTED_INK, false, 2.0)
+		elif selection.has("cell"):
+			draw_rect(draft.asset_rect(selection), SELECTED_INK, false, 2.0)
 		else:
-			rect = draft.asset_rect(selection) if selection.has("cell") else draft.building_rect(selection)
-		draw_rect(rect, SELECTED_INK, false, 2.0)
+			for member in draft.building_unit(selection.id):
+				draw_rect(draft.building_rect(member), SELECTED_INK, false, 2.0)
 	if ghost.has_area():
 		var ink := VALID_INK if ghost_check.get("ok", true) else INVALID_INK
 		for cell in stroke_cells:
 			draw_rect(Rect2(Vector2(cell) * Layout.GRID, Vector2.ONE * Layout.GRID), Color(ink, 0.40))
 		draw_rect(ghost, Color(ink, 0.26))
-		if tool == "asset" and furniture:
-			var atlas_origin := Vector2(asset_rotation, Renderer.FURNITURE_ROWS[asset]) * Renderer.ATLAS_CELL
-			draw_texture_rect_region(furniture, ghost, Rect2(atlas_origin, ghost.size), Color(1, 1, 1, 0.72))
+		if tool == "asset":
+			Renderer.draw_furniture(self, asset, asset_rotation, ghost, Color(1, 1, 1, 0.72))
 		elif tool in ["prop", "move"]:
-			LandscapeRenderer.draw_prop(self, _prop_ghost(), Color(1, 1, 1, 0.72))
+			var prop := _prop_ghost()
+			LandscapeRenderer.draw_prop(self, prop, Color(1, 1, 1, 0.72))
+			if ghost_check.get("ok", false) and Landscape.PROP_CATALOG[prop.kind].get("gate", false):
+				var gate := draft.facility_gate(prop)
+				var gate_ink := VALID_INK if not draft.route(Layout.ENTRY, gate).is_empty() else INVALID_INK
+				draw_rect(Rect2(gate - Vector2(4, 4), Vector2(8, 8)), gate_ink, false, 2.0)
 		draw_rect(ghost, ink, false, 1.0)
+		if tool == "building" and ghost_check.get("ok", false):
+			var entity := {"rect": [ghost.position.x, ghost.position.y, ghost.size.x, ghost.size.y], "rotation": building_rotation}
+			var side := draft.door_side(entity)
+			var edge := draft.door_point(entity) + side * Layout.GRID * 0.5
+			var tangent := side.orthogonal() * Layout.GRID * 0.5
+			draw_line(edge - tangent, edge + tangent, ink, 3.0)
+			draw_line(edge, edge + side * Layout.GRID * 0.5, ink, 2.0)
